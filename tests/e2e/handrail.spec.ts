@@ -163,7 +163,7 @@ test.describe('handoff between teammates', () => {
     await expect(riya.getByTestId('change-list')).toHaveCount(0);
     await expect(riya.getByTestId('changes')).toContainText('Nothing new');
     await riya.getByRole('button', { name: 'Settings' }).click();
-    await riya.getByLabel('Your name').fill('Riya');
+    await riya.getByTestId('settings').getByLabel('Your name').fill('Riya');
     await riya.getByRole('button', { name: 'Done', exact: true }).click();
     await expect(riya.getByTestId('settings')).toBeHidden();
     await run(riya, 'move design slides to done');
@@ -188,6 +188,39 @@ test.describe('handoff between teammates', () => {
     await expect(page.getByTestId('change-list')).toHaveCount(0);
     await expect(page.getByTestId('changes-collapsed')).toHaveText(/2 changes, 1 for you\s*Show/);
     await expect(page.getByRole('button', { name: 'Show changes' })).toBeFocused();
+  });
+
+  test('links merge instead of overwriting, and clashes are explained', async ({ page, browser }) => {
+    await page.getByRole('button', { name: 'Share' }).click();
+    const link = await page.getByLabel(/Link to/).inputValue();
+    await page.keyboard.press('Escape');
+
+    // Riya edits her copy...
+    const riyaCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const riya = await riyaCtx.newPage();
+    await riya.goto(link);
+    // A new device opened from a link starts with the shared board only, and asks for a name.
+    await expect(riya.locator('[data-card]')).toHaveCount(7);
+    await riya.locator('#name-prompt-input').fill('Riya');
+    await riya.getByRole('button', { name: 'Save' }).click();
+    await expect(riya.getByRole('heading', { name: 'What’s your name?' })).toHaveCount(0);
+    await run(riya, 'move design slides to done');
+    await run(riya, 'email due tomorrow');
+    await riya.getByRole('button', { name: 'Share' }).click();
+    const back = await riya.getByLabel(/Link to/).inputValue();
+    await riyaCtx.close();
+
+    // ...while Priya, who hasn't seen that yet, edits hers.
+    await run(page, 'add check the citations');
+    await run(page, 'email due next monday');
+
+    await page.goto(back);
+    await expect(cardIn(page, 'To do', 'check the citations')).toBeVisible();
+    await expect(cardIn(page, 'Done', 'Design slides')).toBeVisible();
+    const items = page.getByTestId('change-list').getByRole('listitem');
+    await expect(items).toHaveCount(3);
+    await expect(items.first()).toContainText(/You and Riya both changed the due date of “Email Dr\. Mehta about the extension” at the same time\. Handrail kept/);
+    await expect(items.filter({ hasText: 'Riya moved “Design slides 4 to 8” from To do to Done.' })).toHaveCount(1);
   });
 
   test('the built-in demo simulates teammates’ overnight changes', async ({ page }) => {

@@ -275,6 +275,7 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .activity-scroll h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 .activity-input { border-top: 1px solid var(--border); padding: 0.75rem 1rem 0.9rem; background: var(--surface); }
 .empty-note { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.name-prompt { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.9rem; border-radius: var(--radius-lg); background: var(--accent-soft); border: 1px solid var(--accent); }
 
 /* ---- Command bar -------------------------------------------------------- */
 .command-form { display: flex; flex-direction: column; gap: 0.4rem; }

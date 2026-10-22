@@ -3,6 +3,7 @@ import { createBoard } from '../model/board';
 import { exportCsv, exportJson, exportMarkdown, importCsv, importHandrailJson, importTrello } from '../model/importers';
 import { shareUrl } from '../model/share';
 import type { Board } from '../model/types';
+import type { Doc } from '../model/crdt';
 import { speak } from '../lib/speech';
 import type { Settings } from '../store/useHandrail';
 import { Modal } from './Modal';
@@ -164,12 +165,12 @@ export function HelpDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
 // ---- Share ------------------------------------------------------------------
 
-export function ShareDialog({ open, onClose, board, me, onOpenSettings }: {
-  open: boolean; onClose: () => void; board: Board; me: string | null; onOpenSettings: () => void;
+export function ShareDialog({ open, onClose, board, doc, me, onOpenSettings }: {
+  open: boolean; onClose: () => void; board: Board; doc: Doc; me: string | null; onOpenSettings: () => void;
 }) {
   const [status, setStatus] = useState('');
   const field = useRef<HTMLTextAreaElement>(null);
-  const url = open ? shareUrl(board, window.location.href) : '';
+  const url = open ? shareUrl(doc, window.location.href) : '';
   useEffect(() => setStatus(''), [open]);
 
   async function copy() {
@@ -186,8 +187,8 @@ export function ShareDialog({ open, onClose, board, me, onOpenSettings }: {
     <Modal open={open} onClose={onClose} title="Share this board" testId="share">
       <div className="form">
         <p>
-          This link holds the whole board, so there is no account or server. Send it to your group. When someone changes the board, they send a new link,
-          and Handrail tells everyone else exactly what changed.
+          This link holds the whole board, so there is no account or server. Send it to your group. When a teammate sends their link back, Handrail
+          merges it with your copy, so nobody's work is lost even if you both edited at once, and tells you exactly what changed.
         </p>
         {!me && (
           <p className="notice">

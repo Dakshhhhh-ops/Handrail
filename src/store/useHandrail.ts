@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
-import { diffBoards, type Change } from '../model/diff';
-import { demoBoard } from '../model/seed';
+import { commit, docFromBoard, findConflicts, materialize, mergeDocs, validateDoc, type Doc } from '../model/crdt';
+import { describeConflicts, diffBoards, type Change } from '../model/diff';
+import { newId } from '../model/board';
+import { demoBoard, demoTeammateEdits } from '../model/seed';
 import { validateBoard } from '../model/validate';
+import { docFromHash } from '../model/share';
 import type { Board } from '../model/types';
 
 export interface Settings {
@@ -29,13 +32,16 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 interface Saved {
-  boards: Record<string, Board>;
+  /** This device's id in the shared documents. */
+  actor: string;
+  /** The source of truth: one conflict-free document per board. */
+  docs: Record<string, Doc>;
   currentId: string;
-  /** The version of each board the user last looked at (or edited themselves). */
+  /** The board as the user last saw it (their own edits count as seen). */
   seen: Record<string, Board>;
-  /** Teammates' changes not yet acknowledged, per board, worked out when a shared link was opened. */
+  /** Teammates' changes not yet acknowledged, worked out when a shared link was opened. */
   inbox: Record<string, Change[]>;
-  /** Boards whose inbox the user has acknowledged with "Got it" (shown collapsed until new changes arrive). */
+  /** Boards whose inbox the user acknowledged with "Got it" (shown collapsed until new changes arrive). */
   acknowledged: Record<string, boolean>;
   settings: Settings;
 }
@@ -58,8 +64,9 @@ type Action =
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'markSeen' }
-  | { type: 'loadShared'; board: Board }
+  | { type: 'loadShared'; doc: Doc }
   | { type: 'create'; board: Board }
+  | { type: 'simulate' }
   | { type: 'switch'; id: string }
   | { type: 'deleteBoard'; id: string }
   | { type: 'settings'; patch: Partial<Settings> };
@@ -67,52 +74,92 @@ type Action =
 const KEY = 'handrail:v1';
 const HISTORY = 60;
 
+// Views are derived from documents; cache them so React sees stable objects.
+const views = new WeakMap<Doc, Board>();
+export function view(doc: Doc): Board {
+  let b = views.get(doc);
+  if (!b) {
+    b = materialize(doc);
+    views.set(doc, b);
+  }
+  return b;
+}
+
+const nameOf = (s: Saved) => s.settings.name.trim() || null;
+
 function freshSaved(): Saved {
-  const b = demoBoard(new Date());
-  return { boards: { [b.id]: b }, currentId: b.id, seen: { [b.id]: b }, inbox: {}, acknowledged: {}, settings: { ...DEFAULT_SETTINGS, name: 'Priya' } };
+  const actor = newId('d');
+  // Opened from a teammate's link on a new device: start with just their board, and no
+  // name yet (the app asks), instead of a sample board that would then be merged in.
+  const shared = typeof window !== 'undefined' ? docFromHash(window.location.hash) : null;
+  if (shared) {
+    return {
+      actor, docs: { [shared.id]: shared }, currentId: shared.id, seen: { [shared.id]: view(shared) },
+      inbox: {}, acknowledged: {}, settings: { ...DEFAULT_SETTINGS },
+    };
+  }
+  const doc = docFromBoard(demoBoard(new Date()), actor, 'Priya');
+  return {
+    actor,
+    docs: { [doc.id]: doc },
+    currentId: doc.id,
+    seen: { [doc.id]: view(doc) },
+    inbox: {},
+    acknowledged: {},
+    settings: { ...DEFAULT_SETTINGS, name: 'Priya' },
+  };
 }
 
 export function loadSaved(): Saved {
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return freshSaved();
-    const parsed = JSON.parse(raw) as Partial<Saved>;
-    const boards: Record<string, Board> = {};
+    const parsed = JSON.parse(raw) as Partial<Saved> & { boards?: Record<string, unknown> };
+    const settings = { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) };
+    const actor = typeof parsed.actor === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(parsed.actor) ? parsed.actor : newId('d');
+
+    const docs: Record<string, Doc> = {};
+    for (const d of Object.values(parsed.docs ?? {})) {
+      const v = validateDoc(d);
+      if (v) docs[v.id] = v;
+    }
+    // Data saved before boards became documents.
     for (const b of Object.values(parsed.boards ?? {})) {
       const v = validateBoard(b);
-      if (v) boards[v.id] = v;
+      if (v && !docs[v.id]) docs[v.id] = docFromBoard(v, actor, settings.name.trim() || null);
     }
-    const ids = Object.keys(boards);
+    const ids = Object.keys(docs);
     if (ids.length === 0) return freshSaved();
+
     const seen: Record<string, Board> = {};
     for (const [id, b] of Object.entries(parsed.seen ?? {})) {
       const v = validateBoard(b);
-      if (v && boards[id]) seen[id] = v;
+      if (v && docs[id]) seen[id] = v;
     }
     const inbox: Record<string, Change[]> = {};
     for (const [id, list] of Object.entries(parsed.inbox ?? {})) {
-      if (!boards[id] || !Array.isArray(list)) continue;
+      if (!docs[id] || !Array.isArray(list)) continue;
       inbox[id] = list
         .filter((c) => c && typeof c.text === 'string')
         .slice(0, 200)
-        .map((c) => ({ kind: c.kind, text: c.text.slice(0, 500), forYou: !!c.forYou, cardId: typeof c.cardId === 'string' ? c.cardId : undefined }));
+        .map((c) => ({
+          kind: c.kind, text: c.text.slice(0, 500), forYou: !!c.forYou,
+          cardId: typeof c.cardId === 'string' ? c.cardId : undefined,
+          by: typeof c.by === 'string' ? c.by.slice(0, 60) : null,
+        }));
     }
     return {
-      boards,
-      currentId: parsed.currentId && boards[parsed.currentId] ? parsed.currentId : ids[0],
+      actor,
+      docs,
+      currentId: parsed.currentId && docs[parsed.currentId] ? parsed.currentId : ids[0],
       seen,
       inbox,
       acknowledged: Object.fromEntries(Object.entries(parsed.acknowledged ?? {}).filter(([id, v]) => inbox[id] && v === true)),
-      settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+      settings,
     };
   } catch {
     return freshSaved();
   }
-}
-
-/** Saves a new version of the current board. You have always seen your own edits. */
-function withBoard(saved: Saved, board: Board): Saved {
-  return { ...saved, boards: { ...saved.boards, [board.id]: board }, seen: { ...saved.seen, [board.id]: board } };
 }
 
 const without = <T,>(rec: Record<string, T>, id: string) => {
@@ -121,29 +168,80 @@ const without = <T,>(rec: Record<string, T>, id: string) => {
   return copy;
 };
 
+/** Records an edited view of the current board as writes by this device. */
+function write(saved: Saved, board: Board, markSeen: boolean): Saved {
+  const doc = saved.docs[board.id];
+  const next = doc ? commit(doc, board, saved.actor, nameOf(saved)) : docFromBoard(board, saved.actor, nameOf(saved));
+  if (next === doc && !markSeen) return saved;
+  return {
+    ...saved,
+    docs: { ...saved.docs, [board.id]: next },
+    // You have always seen your own edits.
+    seen: markSeen ? { ...saved.seen, [board.id]: view(next) } : saved.seen,
+  };
+}
+
+/** Merges a teammate's copy into ours and works out what they changed since we last looked. */
+function receive(saved: Saved, remote: Doc): Saved {
+  const local = saved.docs[remote.id];
+  const merged = local ? mergeDocs(local, remote) : remote;
+  const me = nameOf(saved);
+  const now = view(merged);
+  // A board you have never seen before has nothing to compare against.
+  const base = saved.seen[remote.id] ?? (local ? view(local) : null);
+  const fresh = [
+    ...(local ? describeConflicts(findConflicts(local, remote, saved.actor), now) : []),
+    ...(base ? diffBoards(base, now, me, new Date()) : []),
+  ];
+  // New changes replace an acknowledged list; otherwise they add to what is still unread.
+  const wasAcknowledged = !!saved.acknowledged[remote.id];
+  const unread = fresh.length && wasAcknowledged ? fresh : [...(saved.inbox[remote.id] ?? []), ...fresh];
+  return {
+    ...saved,
+    docs: { ...saved.docs, [remote.id]: merged },
+    currentId: remote.id,
+    seen: { ...saved.seen, [remote.id]: now },
+    inbox: unread.length ? { ...saved.inbox, [remote.id]: unread } : without(saved.inbox, remote.id),
+    acknowledged: fresh.length ? without(saved.acknowledged, remote.id) : saved.acknowledged,
+  };
+}
+
+function created(saved: Saved, board: Board): Saved {
+  const doc = docFromBoard(board, saved.actor, nameOf(saved));
+  return {
+    ...saved,
+    docs: { ...saved.docs, [doc.id]: doc },
+    currentId: doc.id,
+    seen: { ...saved.seen, [doc.id]: view(doc) },
+    inbox: without(saved.inbox, doc.id),
+    acknowledged: without(saved.acknowledged, doc.id),
+  };
+}
+
 function reducer(state: State, action: Action): State {
   const { saved } = state;
-  const current = saved.boards[saved.currentId];
+  const current = view(saved.docs[saved.currentId]);
   switch (action.type) {
     case 'apply':
       return {
-        saved: withBoard(saved, action.board),
+        saved: write(saved, action.board, true),
         past: [...state.past, { board: current, label: action.label }].slice(-HISTORY),
         future: [],
       };
     case 'replace':
-      return { ...state, saved: { ...saved, boards: { ...saved.boards, [action.board.id]: action.board } } };
+      return { ...state, saved: write(saved, action.board, false) };
     case 'commitFrom':
       return {
-        saved: withBoard(saved, current),
+        saved: write(saved, current, true),
         past: [...state.past, { board: action.origin, label: action.label }].slice(-HISTORY),
         future: [],
       };
     case 'undo': {
       const prev = state.past[state.past.length - 1];
       if (!prev) return state;
+      // Undo is a new edit that writes the old values back, so it syncs like any other change.
       return {
-        saved: { ...saved, boards: { ...saved.boards, [prev.board.id]: prev.board } },
+        saved: write(saved, prev.board, true),
         past: state.past.slice(0, -1),
         future: [{ board: current, label: prev.label }, ...state.future],
       };
@@ -152,7 +250,7 @@ function reducer(state: State, action: Action): State {
       const next = state.future[0];
       if (!next) return state;
       return {
-        saved: { ...saved, boards: { ...saved.boards, [next.board.id]: next.board } },
+        saved: write(saved, next.board, true),
         past: [...state.past, { board: current, label: next.label }],
         future: state.future.slice(1),
       };
@@ -163,55 +261,38 @@ function reducer(state: State, action: Action): State {
         saved: { ...saved, seen: { ...saved.seen, [saved.currentId]: current }, acknowledged: { ...saved.acknowledged, [saved.currentId]: true } },
       };
     case 'loadShared': {
-      const b = action.board;
-      const sameBoardOpen = b.id === saved.currentId;
-      // A board you have never seen before has nothing to compare against.
-      const base = saved.seen[b.id] ?? saved.boards[b.id];
-      const fresh = base ? diffBoards(base, b, saved.settings.name.trim() || null, new Date()) : [];
-      // New changes replace an acknowledged list; otherwise they add to what is still unread.
-      const wasAcknowledged = !!saved.acknowledged[b.id];
-      const unread = fresh.length && wasAcknowledged ? fresh : [...(saved.inbox[b.id] ?? []), ...fresh];
+      const sameBoardOpen = action.doc.id === saved.currentId;
       return {
-        saved: {
-          ...saved,
-          boards: { ...saved.boards, [b.id]: b },
-          currentId: b.id,
-          seen: { ...saved.seen, [b.id]: b },
-          inbox: unread.length ? { ...saved.inbox, [b.id]: unread } : without(saved.inbox, b.id),
-          acknowledged: fresh.length ? without(saved.acknowledged, b.id) : saved.acknowledged,
-        },
+        saved: receive(saved, action.doc),
         past: sameBoardOpen ? [...state.past, { board: current, label: 'open the shared version' }] : [],
         future: [],
       };
     }
     case 'create':
-      return {
-        saved: {
-          ...saved,
-          boards: { ...saved.boards, [action.board.id]: action.board },
-          currentId: action.board.id,
-          seen: { ...saved.seen, [action.board.id]: action.board },
-          inbox: without(saved.inbox, action.board.id),
-          acknowledged: without(saved.acknowledged, action.board.id),
-        },
-        past: [],
-        future: [],
-      };
+      return { saved: created(saved, action.board), past: [], future: [] };
+    case 'simulate': {
+      // Start the sample board fresh, then let "Riya" and "Arjun" edit it on their own devices.
+      const start = created(saved, demoBoard(new Date()));
+      let theirs = start.docs[start.currentId];
+      for (const step of demoTeammateEdits(new Date())) {
+        theirs = commit(theirs, step.apply(view(theirs)), step.actor, step.by);
+      }
+      return { saved: receive(start, theirs), past: [], future: [] };
+    }
     case 'switch':
-      if (!saved.boards[action.id] || action.id === saved.currentId) return state;
+      if (!saved.docs[action.id] || action.id === saved.currentId) return state;
       return { saved: { ...saved, currentId: action.id }, past: [], future: [] };
     case 'deleteBoard': {
-      const boards = without(saved.boards, action.id);
-      const seen = without(saved.seen, action.id);
-      const inbox = without(saved.inbox, action.id);
-      const acknowledged = without(saved.acknowledged, action.id);
-      if (Object.keys(boards).length === 0) {
-        const b = demoBoard(new Date());
-        boards[b.id] = b;
-        seen[b.id] = b;
-      }
-      const currentId = boards[saved.currentId] ? saved.currentId : Object.keys(boards)[0];
-      return { saved: { ...saved, boards, seen, inbox, acknowledged, currentId }, past: currentId === saved.currentId ? state.past : [], future: [] };
+      let next: Saved = {
+        ...saved,
+        docs: without(saved.docs, action.id),
+        seen: without(saved.seen, action.id),
+        inbox: without(saved.inbox, action.id),
+        acknowledged: without(saved.acknowledged, action.id),
+      };
+      if (Object.keys(next.docs).length === 0) next = created(next, demoBoard(new Date()));
+      const currentId = next.docs[saved.currentId] ? saved.currentId : Object.keys(next.docs)[0];
+      return { saved: { ...next, currentId }, past: currentId === saved.currentId ? state.past : [], future: [] };
     }
     case 'settings':
       return { ...state, saved: { ...saved, settings: { ...saved.settings, ...action.patch } } };
@@ -230,12 +311,16 @@ export function useHandrail() {
     }
   }, [saved]);
 
-  const board = saved.boards[saved.currentId];
+  const doc = saved.docs[saved.currentId];
+  const board = view(doc);
+  const boards = useMemo(() => Object.values(saved.docs).map(view), [saved.docs]);
   const changes = useMemo(() => saved.inbox[saved.currentId] ?? [], [saved.inbox, saved.currentId]);
 
   return {
     board,
-    boards: Object.values(saved.boards),
+    doc,
+    actor: saved.actor,
+    boards,
     settings: saved.settings,
     me: saved.settings.name.trim() || null,
     changes,
@@ -250,8 +335,9 @@ export function useHandrail() {
     undo: useCallback(() => dispatch({ type: 'undo' }), []),
     redo: useCallback(() => dispatch({ type: 'redo' }), []),
     markSeen: useCallback(() => dispatch({ type: 'markSeen' }), []),
-    loadShared: useCallback((b: Board) => dispatch({ type: 'loadShared', board: b }), []),
+    loadShared: useCallback((d: Doc) => dispatch({ type: 'loadShared', doc: d }), []),
     createBoard: useCallback((b: Board) => dispatch({ type: 'create', board: b }), []),
+    simulateTeammates: useCallback(() => dispatch({ type: 'simulate' }), []),
     switchBoard: useCallback((id: string) => dispatch({ type: 'switch', id }), []),
     deleteBoard: useCallback((id: string) => dispatch({ type: 'deleteBoard', id }), []),
     updateSettings: useCallback((patch: Partial<Settings>) => dispatch({ type: 'settings', patch }), []),

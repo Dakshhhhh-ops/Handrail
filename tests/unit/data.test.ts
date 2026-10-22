@@ -3,7 +3,8 @@ import { addCard, deleteColumn, moveCard } from '../../src/model/board';
 import { diffBoards } from '../../src/model/diff';
 import { exportCsv, importCsv, importTrello, parseCsv, exportMarkdown } from '../../src/model/importers';
 import { demoBoard, demoTeammateUpdate } from '../../src/model/seed';
-import { boardFromHash, decodeBoard, encodeBoard, shareUrl } from '../../src/model/share';
+import { boardFromHash, decodeBoard, docFromHash, encodeBoard, encodeDoc, shareUrl } from '../../src/model/share';
+import { docFromBoard, materialize } from '../../src/model/crdt';
 import { validateBoard } from '../../src/model/validate';
 
 const today = new Date(2026, 9, 22);
@@ -37,11 +38,18 @@ describe('diffBoards (“Since you last looked”)', () => {
 });
 
 describe('share links', () => {
-  it('round-trips a board through a URL', () => {
+  it('round-trips a board document through a URL', () => {
+    const doc = docFromBoard(demoBoard(today), 'priya', 'Priya');
+    const url = shareUrl(doc, 'https://example.org/handrail/#old');
+    expect(url.startsWith('https://example.org/handrail/#board=v2.')).toBe(true);
+    expect(docFromHash(new URL(url).hash)).toEqual(doc);
+    expect(boardFromHash(new URL(url).hash)!.title).toBe('Climate talk: group project');
+  });
+
+  it('still opens old board-only links', () => {
     const b = demoBoard(today);
-    const url = shareUrl(b, 'https://example.org/handrail/#old');
-    expect(url.startsWith('https://example.org/handrail/#board=v1.')).toBe(true);
-    expect(boardFromHash(new URL(url).hash)).toEqual(b);
+    const doc = docFromHash(`#board=${encodeBoard(b)}`)!;
+    expect(materialize(doc).columns.map((c) => c.cardIds)).toEqual(b.columns.map((c) => c.cardIds));
   });
 
   it('rejects garbage safely', () => {
@@ -51,7 +59,7 @@ describe('share links', () => {
   });
 
   it('keeps the demo board link short enough to paste in chat', () => {
-    expect(encodeBoard(demoBoard(today)).length).toBeLessThan(2000);
+    expect(encodeDoc(docFromBoard(demoBoard(today), 'priya', 'Priya')).length).toBeLessThan(2500);
   });
 });
 

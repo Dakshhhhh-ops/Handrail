@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CheckIcon, WarningIcon } from './Icons';
 
 /** ✓ or ⚠ before a reply, with words for screen readers, so success and failure never rely on colour alone. */
@@ -8,6 +8,29 @@ export function ReplyStatus({ ok }: { ok?: boolean }) {
     <span className="status-icon is-ok"><CheckIcon size={16} /></span>
   ) : (
     <span className="status-icon is-fail"><WarningIcon size={16} /><span className="sr-only">Didn’t work: </span></span>
+  );
+}
+
+/** Shown when this device has no name yet, e.g. a teammate who just opened a share link. */
+export function NamePrompt({ onSave }: { onSave: (name: string) => void }) {
+  const [name, setName] = useState('');
+  return (
+    <form
+      className="name-prompt"
+      aria-labelledby="name-prompt-h"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (name.trim()) onSave(name.trim());
+      }}
+    >
+      <h3 id="name-prompt-h">What’s your name?</h3>
+      <p className="empty-note" id="name-prompt-hint">Teammates see it next to the changes you make. Use the name your group knows you by.</p>
+      <div className="command-row">
+        <label htmlFor="name-prompt-input" className="sr-only">Your name</label>
+        <input id="name-prompt-input" className="command-input" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} aria-describedby="name-prompt-hint" autoComplete="given-name" />
+        <button type="submit" className="btn btn-primary">Save</button>
+      </div>
+    </form>
   );
 }
 

@@ -7,15 +7,16 @@ import { cardDetails, positionText, sameName } from './model/describe';
 import { executeCommand } from './model/execute';
 import { previewCommand } from './model/preview';
 import { findColumn, findPerson } from './model/match';
-import { demoBoard, demoTeammateUpdate } from './model/seed';
-import { boardFromHash } from './model/share';
+import { demoBoard } from './model/seed';
+import { docFromHash } from './model/share';
+import { materialize } from './model/crdt';
 import type { Board } from './model/types';
 import { useHandrail, type Handrail } from './store/useHandrail';
 import { AnnouncerProvider, useAnnounce } from './components/Announcer';
 import { BoardView } from './components/BoardView';
 import { CommandBar } from './components/CommandBar';
 import { ChangesPanel } from './components/ChangesPanel';
-import { ActivityContent, type HistoryEntry } from './components/ActivityPanel';
+import { ActivityContent, NamePrompt, type HistoryEntry } from './components/ActivityPanel';
 import { Modal } from './components/Modal';
 import { useMediaQuery } from './lib/useMediaQuery';
 import { CheckIcon, ChevronDownIcon, RedoIcon, UndoIcon } from './components/Icons';
@@ -141,14 +142,14 @@ function Shell({ store }: { store: Handrail }) {
   // ---- Opening a shared link ------------------------------------------------
   useEffect(() => {
     const open = () => {
-      const shared = boardFromHash(window.location.hash);
+      const shared = docFromHash(window.location.hash);
       if (!window.location.hash.startsWith('#board=')) return;
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
       if (!shared) {
         announce('That share link is broken or incomplete. Ask your teammate to copy it again.');
         return;
       }
-      justOpened.current = shared.title;
+      justOpened.current = materialize(shared).title;
       store.loadShared(shared);
     };
     open();
@@ -324,10 +325,8 @@ function Shell({ store }: { store: Handrail }) {
 
   // ---- Demo helpers ------------------------------------------------------
   function simulateTeammates() {
-    const fresh = demoBoard(today);
-    store.createBoard(fresh);
-    justOpened.current = fresh.title;
-    store.loadShared(demoTeammateUpdate(fresh, today));
+    justOpened.current = demoBoard(today).title;
+    store.simulateTeammates();
     setDialog(null);
   }
 
@@ -359,14 +358,15 @@ function Shell({ store }: { store: Handrail }) {
   // Cards teammates changed since you last looked, labelled for the board ("Riya · moved").
   const changedCards: Record<string, string> = {};
   if (!store.changesAcknowledged) {
-    const verbs: Record<ChangeKind, string> = { added: 'new', moved: 'moved', renamed: 'renamed', due: 'new date', assigned: 'reassigned', notes: 'notes', removed: 'removed', column: '' };
-    const kinds: Record<string, string[]> = {};
+    const verbs: Record<ChangeKind, string> = { added: 'new', moved: 'moved', renamed: 'renamed', due: 'new date', assigned: 'reassigned', notes: 'notes', removed: 'removed', column: '', conflict: 'conflict' };
+    const tags: Record<string, { by: string | null; verbs: string[] }> = {};
     for (const c of store.changes) {
       if (!c.cardId || !board.cards[c.cardId] || !verbs[c.kind]) continue;
-      (kinds[c.cardId] ??= []).includes(verbs[c.kind]) || kinds[c.cardId].push(verbs[c.kind]);
+      const tag = (tags[c.cardId] ??= { by: c.by ?? board.cards[c.cardId].lastEditedBy, verbs: [] });
+      if (!tag.verbs.includes(verbs[c.kind])) tag.verbs.push(verbs[c.kind]);
     }
-    for (const [id, list] of Object.entries(kinds)) {
-      changedCards[id] = `${board.cards[id].lastEditedBy ?? 'Someone'} · ${list.join(', ')}`;
+    for (const [id, tag] of Object.entries(tags)) {
+      changedCards[id] = `${tag.by ?? 'Someone'} · ${tag.verbs.join(', ')}`;
     }
   }
 
@@ -398,6 +398,15 @@ function Shell({ store }: { store: Handrail }) {
   );
 
   const changesPanel = (
+    <>
+    {!me && (
+      <NamePrompt
+        onSave={(name) => {
+          store.updateSettings({ name });
+          announce(`Thanks, ${name}. Your changes will show your name.`);
+        }}
+      />
+    )}
     <ChangesPanel
       changes={store.changes}
       acknowledged={store.changesAcknowledged}
@@ -416,6 +425,7 @@ function Shell({ store }: { store: Handrail }) {
         focusLater('changes-show');
       }}
     />
+    </>
   );
 
   return (
@@ -556,7 +566,7 @@ function Shell({ store }: { store: Handrail }) {
       />
       <SettingsDialog open={dialog === 'settings'} onClose={closeDialog} settings={settings} onChange={store.updateSettings} />
       <HelpDialog open={dialog === 'help'} onClose={closeDialog} />
-      <ShareDialog open={dialog === 'share'} onClose={closeDialog} board={board} me={me} onOpenSettings={() => setDialog('settings')} />
+      <ShareDialog open={dialog === 'share'} onClose={closeDialog} board={board} doc={store.doc} me={me} onOpenSettings={() => setDialog('settings')} />
       <BoardsDialog
         open={dialog === 'boards'}
         onClose={closeDialog}

@@ -68,3 +68,37 @@ export function demoTeammateUpdate(board: Board, today: Date): Board {
   next.updatedAt = Date.now();
   return next;
 }
+
+/** The same overnight changes, split by who made them, for the CRDT demo. */
+export function demoTeammateEdits(today: Date): { actor: string; by: string; apply: (b: Board) => Board }[] {
+  const move = (b: Board, id: string, col: string, front: boolean, by: string): Board => {
+    if (!b.cards[id] || !b.columns.some((c) => c.id === col)) return b;
+    const next: Board = structuredClone(b);
+    next.columns.forEach((c) => (c.cardIds = c.cardIds.filter((x) => x !== id)));
+    const target = next.columns.find((c) => c.id === col)!;
+    if (front) target.cardIds.unshift(id);
+    else target.cardIds.push(id);
+    next.cards[id] = { ...next.cards[id], lastEditedBy: by };
+    return next;
+  };
+  return [
+    {
+      actor: 'demo-riya', by: 'Riya',
+      apply: (b) => {
+        let next = move(b, 'k-slides', 'c-done', true, 'Riya');
+        next = structuredClone(next);
+        if (next.cards['k-email']) next.cards['k-email'] = { ...next.cards['k-email'], assignee: 'Priya', lastEditedBy: 'Riya' };
+        const todo = next.columns.find((c) => c.id === 'c-todo');
+        if (todo && !next.cards['k-rehearse']) {
+          next.cards['k-rehearse'] = {
+            id: 'k-rehearse', title: 'Rehearse together on call', notes: 'Riya will share the slides link in the chat.',
+            due: toISODate(addDays(today, 5)), assignee: null, lastEditedBy: 'Riya', updatedAt: Date.now(),
+          };
+          todo.cardIds.push('k-rehearse');
+        }
+        return next;
+      },
+    },
+    { actor: 'demo-arjun', by: 'Arjun', apply: (b) => move(b, 'k-script', 'c-doing', false, 'Arjun') },
+  ];
+}
