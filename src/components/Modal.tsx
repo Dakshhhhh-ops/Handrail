@@ -1,0 +1,67 @@
+import { useEffect, useId, useRef, type ReactNode } from 'react';
+
+/**
+ * A native <dialog>: the browser traps focus, Escape closes it, and screen
+ * readers announce it as a dialog with its heading as the name.
+ */
+export function Modal({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  wide = false,
+  testId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  wide?: boolean;
+  testId?: string;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const id = useId();
+
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (open && !d.open) d.showModal();
+    if (!open && d.open) d.close();
+  }, [open]);
+
+  return (
+    <dialog
+      ref={ref}
+      className={`modal${wide ? ' modal-wide' : ''}`}
+      aria-labelledby={`${id}-t`}
+      aria-describedby={description ? `${id}-d` : undefined}
+      data-testid={testId}
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === ref.current) onClose();
+      }}
+    >
+      {open && (
+        <div className="modal-inner">
+          <div className="modal-head">
+            <h2 id={`${id}-t`}>{title}</h2>
+            <button type="button" className="btn btn-quiet icon-only" onClick={onClose} aria-label="Close">
+              <span aria-hidden="true">✕</span>
+            </button>
+          </div>
+          {description && (
+            <p id={`${id}-d`} className="modal-desc">
+              {description}
+            </p>
+          )}
+          {children}
+        </div>
+      )}
+    </dialog>
+  );
+}
