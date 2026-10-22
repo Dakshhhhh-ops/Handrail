@@ -35,6 +35,8 @@ interface Saved {
   seen: Record<string, Board>;
   /** Teammates' changes not yet acknowledged, per board, worked out when a shared link was opened. */
   inbox: Record<string, Change[]>;
+  /** Boards whose inbox the user has acknowledged with "Got it" (shown collapsed until new changes arrive). */
+  acknowledged: Record<string, boolean>;
   settings: Settings;
 }
 
@@ -67,7 +69,7 @@ const HISTORY = 60;
 
 function freshSaved(): Saved {
   const b = demoBoard(new Date());
-  return { boards: { [b.id]: b }, currentId: b.id, seen: { [b.id]: b }, inbox: {}, settings: { ...DEFAULT_SETTINGS, name: 'Priya' } };
+  return { boards: { [b.id]: b }, currentId: b.id, seen: { [b.id]: b }, inbox: {}, acknowledged: {}, settings: { ...DEFAULT_SETTINGS, name: 'Priya' } };
 }
 
 export function loadSaved(): Saved {
@@ -100,6 +102,7 @@ export function loadSaved(): Saved {
       currentId: parsed.currentId && boards[parsed.currentId] ? parsed.currentId : ids[0],
       seen,
       inbox,
+      acknowledged: Object.fromEntries(Object.entries(parsed.acknowledged ?? {}).filter(([id, v]) => inbox[id] && v === true)),
       settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
     };
   } catch {
@@ -155,14 +158,19 @@ function reducer(state: State, action: Action): State {
       };
     }
     case 'markSeen':
-      return { ...state, saved: { ...saved, seen: { ...saved.seen, [saved.currentId]: current }, inbox: without(saved.inbox, saved.currentId) } };
+      return {
+        ...state,
+        saved: { ...saved, seen: { ...saved.seen, [saved.currentId]: current }, acknowledged: { ...saved.acknowledged, [saved.currentId]: true } },
+      };
     case 'loadShared': {
       const b = action.board;
       const sameBoardOpen = b.id === saved.currentId;
       // A board you have never seen before has nothing to compare against.
       const base = saved.seen[b.id] ?? saved.boards[b.id];
       const fresh = base ? diffBoards(base, b, saved.settings.name.trim() || null, new Date()) : [];
-      const unread = [...(saved.inbox[b.id] ?? []), ...fresh];
+      // New changes replace an acknowledged list; otherwise they add to what is still unread.
+      const wasAcknowledged = !!saved.acknowledged[b.id];
+      const unread = fresh.length && wasAcknowledged ? fresh : [...(saved.inbox[b.id] ?? []), ...fresh];
       return {
         saved: {
           ...saved,
@@ -170,6 +178,7 @@ function reducer(state: State, action: Action): State {
           currentId: b.id,
           seen: { ...saved.seen, [b.id]: b },
           inbox: unread.length ? { ...saved.inbox, [b.id]: unread } : without(saved.inbox, b.id),
+          acknowledged: fresh.length ? without(saved.acknowledged, b.id) : saved.acknowledged,
         },
         past: sameBoardOpen ? [...state.past, { board: current, label: 'open the shared version' }] : [],
         future: [],
@@ -183,6 +192,7 @@ function reducer(state: State, action: Action): State {
           currentId: action.board.id,
           seen: { ...saved.seen, [action.board.id]: action.board },
           inbox: without(saved.inbox, action.board.id),
+          acknowledged: without(saved.acknowledged, action.board.id),
         },
         past: [],
         future: [],
@@ -194,13 +204,14 @@ function reducer(state: State, action: Action): State {
       const boards = without(saved.boards, action.id);
       const seen = without(saved.seen, action.id);
       const inbox = without(saved.inbox, action.id);
+      const acknowledged = without(saved.acknowledged, action.id);
       if (Object.keys(boards).length === 0) {
         const b = demoBoard(new Date());
         boards[b.id] = b;
         seen[b.id] = b;
       }
       const currentId = boards[saved.currentId] ? saved.currentId : Object.keys(boards)[0];
-      return { saved: { ...saved, boards, seen, inbox, currentId }, past: currentId === saved.currentId ? state.past : [], future: [] };
+      return { saved: { ...saved, boards, seen, inbox, acknowledged, currentId }, past: currentId === saved.currentId ? state.past : [], future: [] };
     }
     case 'settings':
       return { ...state, saved: { ...saved, settings: { ...saved.settings, ...action.patch } } };
@@ -228,6 +239,7 @@ export function useHandrail() {
     settings: saved.settings,
     me: saved.settings.name.trim() || null,
     changes,
+    changesAcknowledged: !!saved.acknowledged[saved.currentId],
     canUndo: state.past.length > 0,
     canRedo: state.future.length > 0,
     undoLabel: state.past[state.past.length - 1]?.label ?? null,

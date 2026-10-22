@@ -72,7 +72,10 @@ export function BoardView({
   setFocusedCardId,
   highlightId,
   cb,
+  visible,
 }: {
+  /** When set, only cards that pass are shown (the "Just mine" filter). Hidden cards are never lost. */
+  visible?: (cardId: string) => boolean;
   board: Board;
   today: Date;
   me: string | null;
@@ -87,8 +90,11 @@ export function BoardView({
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const pendingFocus = useRef<string | null>(null);
 
+  const isShown = (id: string) => (visible ? visible(id) : true);
+  const shownIn = (colIndex: number) => board.columns[colIndex].cardIds.filter(isShown);
+
   // Keep exactly one card in the tab order (roving tabindex).
-  const allIds = board.columns.flatMap((c) => c.cardIds);
+  const allIds = board.columns.flatMap((c) => c.cardIds).filter(isShown);
   const tabStop = focusedCardId && allIds.includes(focusedCardId) ? focusedCardId : allIds[0] ?? null;
 
   useEffect(() => {
@@ -147,15 +153,21 @@ export function BoardView({
       return;
     }
     const target = board.columns[ci];
+    // Work in the cards the user can see, then translate to a position in the full column.
+    const here = shownIn(loc.columnIndex);
+    const vi = here.indexOf(cardId);
+    const rest = target.cardIds.filter((id) => id !== cardId);
     let index: number;
     if (dCol === 0) {
-      index = loc.index + dRow;
-      if (index < 0 || index >= target.cardIds.length) {
+      const neighbour = here[vi + dRow];
+      if (!neighbour) {
         announce(dRow < 0 ? `Already at the top of ${target.title}.` : `Already at the bottom of ${target.title}.`);
         return;
       }
+      index = rest.indexOf(neighbour) + (dRow > 0 ? 1 : 0);
     } else {
-      index = Math.min(loc.index, target.cardIds.length);
+      const there = shownIn(ci);
+      index = vi < there.length ? rest.indexOf(there[vi]) : rest.length;
     }
     const next = moveCard(board, cardId, target.id, index, me);
     pendingFocus.current = cardId;
@@ -185,17 +197,20 @@ export function BoardView({
     const loc = locate(board, cardId);
     if (!loc) return;
     if (dCol === 0) {
-      const id = loc.column.cardIds[loc.index + dRow];
+      const here = shownIn(loc.columnIndex);
+      const id = here[here.indexOf(cardId) + dRow];
       if (id) focusCard(id);
       else announce(dRow < 0 ? `Top of ${loc.column.title}.` : `Bottom of ${loc.column.title}.`);
       return;
     }
     const skipped: string[] = [];
+    const vi = shownIn(loc.columnIndex).indexOf(cardId);
     for (let ci = loc.columnIndex + dCol; ci >= 0 && ci < board.columns.length; ci += dCol) {
       const col = board.columns[ci];
-      if (col.cardIds.length) {
+      const ids = shownIn(ci);
+      if (ids.length) {
         if (skipped.length) announce(`${skipped.join(' and ')} ${skipped.length > 1 ? 'are' : 'is'} empty.`);
-        focusCard(col.cardIds[Math.min(loc.index, col.cardIds.length - 1)]);
+        focusCard(ids[Math.min(vi, ids.length - 1)]);
         return;
       }
       skipped.push(col.title);
@@ -242,12 +257,14 @@ export function BoardView({
       }
       case 'Home':
         handled();
-        focusCard(loc.column.cardIds[0]);
+        focusCard(shownIn(loc.columnIndex)[0]);
         return;
-      case 'End':
+      case 'End': {
         handled();
-        focusCard(loc.column.cardIds[loc.column.cardIds.length - 1]);
+        const ids = shownIn(loc.columnIndex);
+        focusCard(ids[ids.length - 1]);
         return;
+      }
       case ' ':
         handled();
         setGrab({ cardId, origin: board });
@@ -331,6 +348,8 @@ export function BoardView({
       </p>
       {board.columns.map((col, ci) => {
         const headingId = `col-${col.id}-h`;
+        const ids = shownIn(ci);
+        const filtered = ids.length !== col.cardIds.length;
         return (
           <section key={col.id} className="column" aria-labelledby={headingId} data-testid={`column-${col.title}`}>
             <div className="column-head">
@@ -339,8 +358,8 @@ export function BoardView({
                 {col.title}
                 <span className="count">
                   <span className="sr-only">, </span>
-                  {col.cardIds.length}
-                  <span className="sr-only"> {col.cardIds.length === 1 ? 'card' : 'cards'}</span>
+                  {filtered ? `${ids.length} of ${col.cardIds.length}` : col.cardIds.length}
+                  <span className="sr-only"> {col.cardIds.length === 1 ? 'card' : 'cards'}{filtered ? ' shown' : ''}</span>
                 </span>
               </h2>
               <button type="button" className="btn btn-quiet icon-only" onClick={() => cb.openColumn(col.id)} aria-label={`Options for column ${col.title}`}>
@@ -359,12 +378,13 @@ export function BoardView({
                 dropAt(col.id, col.cardIds.length);
               }}
             >
-              {col.cardIds.length === 0 && (
+              {ids.length === 0 && (
                 <li className="empty" aria-hidden={dragId ? undefined : true}>
-                  {dragId ? 'Drop here' : 'No cards yet'}
+                  {dragId ? 'Drop here' : filtered ? 'None of yours here' : 'No cards yet'}
                 </li>
               )}
-              {col.cardIds.map((id, i) => {
+              {ids.map((id) => {
+                const i = col.cardIds.indexOf(id);
                 const card = board.cards[id];
                 const grabbed = grab?.cardId === id;
                 const cls = [

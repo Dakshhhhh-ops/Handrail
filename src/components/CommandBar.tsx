@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { canListen, listenOnce, type Listener } from '../lib/speech';
 import { useAnnounce } from './Announcer';
+import type { HistoryEntry } from './ActivityPanel';
 
 const EXAMPLES = [
   'what changed',
@@ -10,13 +11,13 @@ const EXAMPLES = [
   'my tasks',
 ];
 
-export function CommandBar({ onRun }: { onRun: (text: string) => boolean }) {
+export function CommandBar({ onRun, lastReply }: { onRun: (text: string) => boolean; lastReply?: HistoryEntry | null }) {
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const [voiceOk, setVoiceOk] = useState(false);
   const listener = useRef<Listener | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  const { announce, message } = useAnnounce();
+  const { announce } = useAnnounce();
 
   useEffect(() => setVoiceOk(canListen()), []);
   useEffect(() => () => listener.current?.stop(), []);
@@ -113,9 +114,11 @@ export function CommandBar({ onRun }: { onRun: (text: string) => boolean }) {
           </button>
         ))}
       </div>
-      <p className="reply" data-testid="reply">
-        {message || 'Ready. Your board is below.'}
-      </p>
+      {lastReply && (
+        <p className={`last-reply${lastReply.ok === false ? ' is-fail' : ''}`} data-testid="last-reply">
+          {lastReply.text}
+        </p>
+      )}
     </section>
   );
 }

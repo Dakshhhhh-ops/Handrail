@@ -11,6 +11,7 @@ export function Modal({
   description,
   children,
   wide = false,
+  full = false,
   testId,
 }: {
   open: boolean;
@@ -19,6 +20,8 @@ export function Modal({
   description?: string;
   children: ReactNode;
   wide?: boolean;
+  /** Fills the screen (used for the Activity panel on phones). */
+  full?: boolean;
   testId?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -38,7 +41,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className={`modal${wide ? ' modal-wide' : ''}`}
+      className={`modal${wide ? ' modal-wide' : ''}${full ? ' modal-full' : ''}`}
       aria-labelledby={`${id}-t`}
       aria-describedby={description ? `${id}-d` : undefined}
       data-testid={testId}

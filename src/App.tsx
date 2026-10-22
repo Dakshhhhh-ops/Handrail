@@ -3,7 +3,7 @@ import {
   addCard, addColumn, deleteCard, deleteColumn, locate, moveCard, moveColumn, peopleOn, renameBoard, renameColumn, updateCard,
 } from './model/board';
 import { parseCommand } from './model/commands';
-import { cardDetails, positionText } from './model/describe';
+import { cardDetails, positionText, sameName } from './model/describe';
 import { executeCommand } from './model/execute';
 import { findColumn, findPerson } from './model/match';
 import { demoBoard, demoTeammateUpdate } from './model/seed';
@@ -14,6 +14,9 @@ import { AnnouncerProvider, useAnnounce } from './components/Announcer';
 import { BoardView } from './components/BoardView';
 import { CommandBar } from './components/CommandBar';
 import { ChangesPanel } from './components/ChangesPanel';
+import { ActivityContent, type HistoryEntry } from './components/ActivityPanel';
+import { Modal } from './components/Modal';
+import { useMediaQuery } from './lib/useMediaQuery';
 import { CardActionsDialog, CardEditorDialog, ColumnDialog, type EditorValue } from './components/CardDialogs';
 import { BoardsDialog, HelpDialog, SettingsDialog, ShareDialog } from './components/AppDialogs';
 
@@ -53,6 +56,15 @@ function Shell({ store }: { store: Handrail }) {
   const [focusTarget, setFocusTarget] = useState<{ id: string; n: number } | null>(null);
   const lastFocus = useRef<HTMLElement | null>(null);
   const justOpened = useRef<string | null>(null);
+  const wide = useMediaQuery('(min-width: 1000px)');
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const historyId = useRef(0);
+  const [justMine, setJustMine] = useState(false);
+
+  const addHistory = useCallback((who: HistoryEntry['who'], text: string, ok?: boolean) => {
+    setHistory((h) => [...h, { id: ++historyId.current, who, text, ok }].slice(-80));
+  }, []);
 
   const focusLater = useCallback((id: string) => setFocusTarget({ id, n: Date.now() }), []);
   const focusCardLater = useCallback((cardId: string | undefined | null) => {
@@ -102,7 +114,7 @@ function Shell({ store }: { store: Handrail }) {
     const open = () => {
       const shared = boardFromHash(window.location.hash);
       if (!window.location.hash.startsWith('#board=')) return;
-      history.replaceState(null, '', window.location.pathname + window.location.search);
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
       if (!shared) {
         announce('That share link is broken or incomplete. Ask your teammate to copy it again.');
         return;
@@ -124,22 +136,28 @@ function Shell({ store }: { store: Handrail }) {
     if (n > 0) {
       const forYou = store.changes.filter((c) => c.forYou).length;
       announce(`Opened the shared “${title}”. ${n} ${n === 1 ? 'change' : 'changes'} since you last looked${forYou ? `, ${forYou} for you` : ''}. The list is next.`);
-      focusLater('changes');
+      if (wide) focusLater('changes');
+      else {
+        lastFocus.current = null;
+        setActivityOpen(true);
+      }
     } else {
       announce(`Opened the shared “${title}”. Nothing new since you last looked.`);
     }
-  }, [store.changes, focusLater, announce]);
+  }, [store.changes, focusLater, announce, wide]);
 
   // ---- Undo / redo -----------------------------------------------------------
-  const undo = useCallback(() => {
-    if (!store.canUndo) return announce('Nothing to undo.');
-    announce(`Undid: ${store.undoLabel}.`);
+  const undo = useCallback((): string => {
+    const msg = store.canUndo ? `Undid: ${store.undoLabel}.` : 'Nothing to undo.';
+    announce(msg);
     store.undo();
+    return msg;
   }, [store, announce]);
-  const redo = useCallback(() => {
-    if (!store.canRedo) return announce('Nothing to redo.');
-    announce(`Redid: ${store.redoLabel}.`);
+  const redo = useCallback((): string => {
+    const msg = store.canRedo ? `Redid: ${store.redoLabel}.` : 'Nothing to redo.';
+    announce(msg);
     store.redo();
+    return msg;
   }, [store, announce]);
 
   // ---- Global shortcuts --------------------------------------------------
@@ -180,15 +198,15 @@ function Shell({ store }: { store: Handrail }) {
       isPerson: (t) => !!findPerson(peopleOn(board), t, me),
     });
     const r = executeCommand(cmd, board, { today, me });
-    if (r.effect === 'undo') undo();
-    else if (r.effect === 'redo') redo();
-    else if (r.effect === 'help') { openDialog('help'); announce('Opened help.'); }
-    else if (r.effect === 'changes') {
-      if (store.changes.length === 0) announce('Nothing has changed since you last looked.');
-      else { announce(readChanges()); }
-    }
+    let reply = r.message;
+    if (r.effect === 'undo') reply = undo();
+    else if (r.effect === 'redo') reply = redo();
+    else if (r.effect === 'help') { openDialog('help'); reply = 'Opened help.'; }
+    else if (r.effect === 'changes') reply = store.changes.length === 0 ? 'Nothing has changed since you last looked.' : readChanges();
     if (r.board) store.apply(r.board, r.label ?? 'change');
-    if (r.message) announce(r.message);
+    if (reply && r.effect !== 'undo' && r.effect !== 'redo') announce(reply);
+    addHistory('you', text);
+    addHistory('handrail', reply, r.ok);
     if (r.focusCardId) {
       setFocusedCardId(r.focusCardId);
       setHighlightId(r.focusCardId);
@@ -300,12 +318,68 @@ function Shell({ store }: { store: Handrail }) {
   };
 
   const cardCount = Object.keys(board.cards).length;
+  const visible = justMine && me ? (id: string) => sameName(board.cards[id]?.assignee ?? null, me) : undefined;
+  const firstCard = board.columns.flatMap((c) => c.cardIds).find((id) => !visible || visible(id)) ?? null;
+  const unread = store.changesAcknowledged ? 0 : store.changes.length;
+
+  function openActivity() {
+    lastFocus.current = document.activeElement as HTMLElement | null;
+    setActivityOpen(true);
+  }
+  function closeActivity() {
+    setActivityOpen(false);
+    const el = lastFocus.current;
+    window.requestAnimationFrame(() => (el && document.contains(el) ? el : document.getElementById('command-input'))?.focus());
+  }
+
+  function toggleJustMine() {
+    if (!me) {
+      announce('Set your name in Settings first, so Handrail knows which cards are yours.');
+      return;
+    }
+    const next = !justMine;
+    setJustMine(next);
+    const mine = Object.values(board.cards).filter((c) => sameName(c.assignee, me)).length;
+    announce(next ? `Showing only your ${mine} ${mine === 1 ? 'card' : 'cards'} and the changes that involve you.` : 'Showing everyone\u2019s cards.');
+  }
+
+  const justMineButton = (
+    <button type="button" className={`btn btn-secondary small toggle${justMine ? ' is-on' : ''}`} aria-pressed={justMine} onClick={toggleJustMine}>
+      {justMine && <span aria-hidden="true">✓</span>} Just mine
+    </button>
+  );
+
+  const changesPanel = (
+    <ChangesPanel
+      changes={store.changes}
+      acknowledged={store.changesAcknowledged}
+      justMine={justMine}
+      board={board}
+      onGoTo={(id) => {
+        if (visible && !visible(id)) setJustMine(false);
+        setActivityOpen(false);
+        focusCardLater(id);
+        setHighlightId(id);
+      }}
+      onReadAll={() => announce(readChanges())}
+      onDone={() => {
+        store.markSeen();
+        announce('Marked as seen. The changes stay collapsed in Activity until new ones arrive.');
+        focusLater('changes-show');
+      }}
+    />
+  );
 
   return (
     <>
-      <a className="skip-link" href="#command-input">Skip to the command box</a>
-      <a className="skip-link" href="#board" onClick={(e) => { e.preventDefault(); focusCardLater(focusedCardId ?? board.columns.flatMap((c) => c.cardIds)[0]); }}>
+      <a className="skip-link" href="#board" onClick={(e) => { e.preventDefault(); focusCardLater(focusedCardId ?? firstCard); }}>
         Skip to the board
+      </a>
+      <a className="skip-link" href="#activity" onClick={(e) => { e.preventDefault(); if (wide) focusLater('activity-h'); else openActivity(); }}>
+        Skip to activity
+      </a>
+      <a className="skip-link" href="#command-input" onClick={(e) => { e.preventDefault(); focusLater('command-input'); }}>
+        Skip to the command box
       </a>
       <header className="topbar">
         <div className="brand">
@@ -328,6 +402,7 @@ function Shell({ store }: { store: Handrail }) {
         </nav>
       </header>
 
+      <div className={`layout ${wide ? 'is-wide' : 'is-narrow'}`}>
       <main id="main">
         <div className="board-head">
           {renaming ? (
@@ -358,21 +433,8 @@ function Shell({ store }: { store: Handrail }) {
             <span className="sep" aria-hidden="true">·</span>
             {board.columns.length} columns, {cardCount} {cardCount === 1 ? 'card' : 'cards'}
           </p>
+          {justMineButton}
         </div>
-
-        <CommandBar onRun={runCommand} />
-
-        <ChangesPanel
-          changes={store.changes}
-          board={board}
-          onGoTo={(id) => { focusCardLater(id); setHighlightId(id); }}
-          onReadAll={() => announce(readChanges())}
-          onDone={() => {
-            store.markSeen();
-            announce('Marked as seen.');
-            focusCardLater(focusedCardId ?? board.columns.flatMap((c) => c.cardIds)[0]);
-          }}
-        />
 
         <div className={`board-wrap layout-${settings.layout}`}>
           <BoardView
@@ -383,15 +445,36 @@ function Shell({ store }: { store: Handrail }) {
             setFocusedCardId={setFocusedCardId}
             highlightId={highlightId}
             cb={cb}
+            visible={visible}
           />
         </div>
       </main>
+      {wide && (
+        <aside className="activity" id="activity" aria-labelledby="activity-h">
+          <ActivityContent changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} />} />
+        </aside>
+      )}
+      </div>
 
       <footer className="footer">
         <p>
           Handrail keeps your boards on this device. No account, no tracking. <a href="https://github.com/Dakshhhhh-ops/Handrail">Source code</a>
         </p>
       </footer>
+
+      {!wide && !activityOpen && (
+        <div className="dock" id="activity" role="region" aria-label="Commands and activity">
+          <button type="button" className="btn btn-secondary dock-activity" onClick={openActivity} aria-haspopup="dialog">
+            Activity{unread > 0 && <span className="pill">{unread}<span className="sr-only"> new</span></span>}
+          </button>
+          <CommandBar onRun={runCommand} lastReply={history.filter((h) => h.who === 'handrail').at(-1) ?? null} />
+        </div>
+      )}
+      {!wide && (
+        <Modal open={activityOpen} onClose={closeActivity} title="Activity" full testId="activity-dialog">
+          <ActivityContent headless changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} />} />
+        </Modal>
+      )}
 
       <CardActionsDialog
         board={board}

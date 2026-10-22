@@ -2,8 +2,15 @@ import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const live = (page: Page) => page.getByTestId('live-region');
+const reply = (page: Page) => page.getByTestId('reply').last();
 const column = (page: Page, name: string) => page.getByTestId(`column-${name}`);
 const cardIn = (page: Page, col: string, title: string) => column(page, col).locator('[data-card]', { hasText: title });
+
+async function simulate(page: Page) {
+  await page.getByRole('button', { name: 'Boards & files' }).click();
+  await page.getByRole('button', { name: 'Simulate teammates’ changes' }).click();
+  await expect(page.getByTestId('change-list')).toBeVisible();
+}
 
 async function run(page: Page, text: string) {
   await page.locator('#command-input').fill(text);
@@ -18,8 +25,7 @@ test.beforeEach(async ({ page }) => {
 test.describe('keyboard only', () => {
   test('skip link, pick up a card with Space, move it with arrows, drop with Enter', async ({ page }) => {
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('link', { name: 'Skip to the command box' })).toBeFocused();
-    await page.keyboard.press('Tab');
+    await expect(page.getByRole('link', { name: 'Skip to the board' })).toBeFocused();
     await page.keyboard.press('Enter');
     const first = page.locator('[data-card]').first();
     await expect(first).toBeFocused();
@@ -87,24 +93,25 @@ test.describe('keyboard only', () => {
 test.describe('plain-language commands', () => {
   test('add, move, ask and undo', async ({ page }) => {
     await run(page, 'add book a study room due tomorrow for riya');
-    await expect(page.getByTestId('reply')).toContainText('Added “book a study room” to To do, due tomorrow');
-    await expect(page.getByTestId('reply')).toContainText('assigned to Riya');
+    await expect(reply(page)).toContainText('Added “book a study room” to To do, due tomorrow');
+    await expect(reply(page)).toContainText('assigned to Riya');
     await expect(cardIn(page, 'To do', 'book a study room')).toContainText('Riya');
 
     await run(page, 'outline is done');
     await expect(cardIn(page, 'Done', 'Draft the outline')).toBeVisible();
 
     await run(page, "what's due today");
-    await expect(page.getByTestId('reply')).toContainText('Email Dr. Mehta about the extension, due today');
+    await expect(reply(page)).toContainText('Email Dr. Mehta about the extension, due today');
 
     await run(page, 'undo');
-    await expect(page.getByTestId('reply')).toHaveText('Undid: move “Draft the outline” to Done.');
+    await expect(reply(page)).toHaveText(/Undid: move “Draft the outline” to Done\.$/);
+    await expect(page.getByTestId('history').getByRole('listitem')).toHaveCount(8);
     await expect(cardIn(page, 'Doing', 'Draft the outline')).toBeVisible();
   });
 
   test('explains mistakes instead of guessing', async ({ page }) => {
     await run(page, 'move outline to archive');
-    await expect(page.getByTestId('reply')).toContainText('Columns are: To do, Doing, Done.');
+    await expect(reply(page)).toContainText('Columns are: To do, Doing, Done.');
     await expect(page.locator('#command-input')).toHaveValue('move outline to archive');
   });
 });
@@ -121,7 +128,8 @@ test.describe('handoff between teammates', () => {
     const riya = await riyaCtx.newPage();
     await riya.goto(link);
     await expect(riya.getByRole('heading', { level: 1 })).toHaveText('Climate talk: group project');
-    await expect(riya.getByTestId('changes')).toHaveCount(0);
+    await expect(riya.getByTestId('change-list')).toHaveCount(0);
+    await expect(riya.getByTestId('changes')).toContainText('Nothing new');
     await riya.getByRole('button', { name: 'Settings' }).click();
     await riya.getByLabel('Your name').fill('Riya');
     await riya.getByRole('button', { name: 'Done', exact: true }).click();
@@ -144,18 +152,74 @@ test.describe('handoff between teammates', () => {
     await run(page, 'move email to doing');
     await expect(changes.getByRole('listitem')).toHaveCount(2);
     await changes.getByRole('button', { name: 'Got it' }).click();
-    await expect(page.getByTestId('changes')).toHaveCount(0);
+    await expect(page.getByTestId('change-list')).toHaveCount(0);
+    await expect(page.getByTestId('changes-collapsed')).toHaveText(/2 changes, 1 for you\s*Show/);
+    await expect(page.getByRole('button', { name: 'Show changes' })).toBeFocused();
   });
 
   test('the built-in demo simulates teammates’ overnight changes', async ({ page }) => {
     await page.getByRole('button', { name: 'Boards & files' }).click();
     await page.getByRole('button', { name: 'Simulate teammates’ changes' }).click();
-    await expect(page.getByTestId('changes').getByRole('heading')).toContainText('4 changes');
+    await expect(page.getByTestId('changes')).toContainText('4 changes, 1 for you');
   });
 
   test('a broken link is explained', async ({ page }) => {
     await page.goto('/#board=v1.garbage');
     await expect(live(page)).toContainText('That share link is broken or incomplete');
+  });
+});
+
+test.describe('activity panel', () => {
+  test('“Got it” collapses the changes to one row that stays until new changes arrive', async ({ page }) => {
+    await simulate(page);
+    const changes = page.getByTestId('changes');
+    await changes.getByRole('button', { name: 'Got it' }).click();
+    const row = page.getByTestId('changes-collapsed');
+    await expect(row).toContainText('4 changes, 1 for you');
+    await page.reload();
+    await expect(row).toContainText('4 changes, 1 for you');
+
+    await row.getByRole('button', { name: 'Show changes' }).click();
+    await expect(page.getByTestId('change-list').getByRole('listitem')).toHaveCount(4);
+    await changes.getByRole('button', { name: 'Hide changes' }).click();
+    await expect(row).toBeVisible();
+
+    // New changes replace the acknowledged list and open it again.
+    await simulate(page);
+    await expect(page.getByTestId('change-list').getByRole('listitem')).toHaveCount(4);
+    await expect(changes.getByRole('button', { name: 'Got it' })).toBeVisible();
+  });
+
+  test('“Just mine” filters the board and the change list', async ({ page }) => {
+    await simulate(page);
+    const toggle = page.getByRole('button', { name: 'Just mine' });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('[data-card]')).toHaveCount(8);
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(live(page)).toContainText('Showing only your 3 cards');
+    await expect(page.locator('[data-card]')).toHaveText([/Find five sources/, /Email Dr\. Mehta/, /Draft the outline/]);
+    await expect(page.getByTestId('change-list').getByRole('listitem')).toHaveCount(1);
+    await expect(column(page, 'To do').getByRole('heading')).toContainText('2 of 3');
+
+    // Moving within the filtered view keeps hidden cards safe.
+    await cardIn(page, 'To do', 'Email Dr. Mehta').focus();
+    await page.keyboard.press('Alt+ArrowUp');
+    await toggle.click();
+    await expect(page.locator('[data-card]')).toHaveCount(8);
+    await expect(column(page, 'To do').locator('[data-card]').first()).toContainText('Email Dr. Mehta');
+    await expect(column(page, 'To do').locator('[data-card]')).toHaveCount(3);
+  });
+
+  test('every command and reply is kept in the history', async ({ page }) => {
+    await run(page, 'my tasks');
+    await run(page, 'move pizza to done');
+    const items = page.getByTestId('history').getByRole('listitem');
+    await expect(items).toHaveCount(4);
+    await expect(items.nth(0)).toHaveText('You said: my tasks');
+    await expect(items.nth(1)).toContainText('Handrail: You have 2 open cards');
+    await expect(items.nth(3)).toHaveClass(/msg-fail/);
   });
 });
 
@@ -215,6 +279,10 @@ test.describe('automated accessibility audit (axe, WCAG 2.2 AA)', () => {
   test('phone width', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 780 });
     await audit(page);
+    await page.getByRole('button', { name: 'Activity' }).click();
+    await expect(page.getByRole('dialog', { name: 'Activity' })).toBeVisible();
+    await audit(page);
+    await page.keyboard.press('Escape');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });
