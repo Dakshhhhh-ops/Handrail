@@ -123,6 +123,23 @@ test.describe('plain-language commands', () => {
     await expect(cardIn(page, 'Doing', 'Draft the outline')).toBeVisible();
   });
 
+  test('previews what a command will do before it runs', async ({ page }) => {
+    const input = page.locator('#command-input');
+    const preview = page.getByTestId('command-preview');
+    await expect(preview).toBeHidden();
+    await expect(input).toHaveAttribute('aria-describedby', /command-preview/);
+    await input.pressSequentially('move find sources to doing');
+    await expect(preview).toHaveText('→ Move “Find five sources on heat waves” to Doing');
+    await expect(input).toHaveAccessibleDescription(/Move “Find five sources on heat waves” to Doing/);
+    // The preview is not announced while typing.
+    await expect(live(page)).not.toContainText('Move “Find five sources');
+    await input.fill('blorp');
+    await expect(preview).toHaveText('→ I don’t understand that yet');
+    await expect(preview).toHaveClass(/is-fail/);
+    await input.fill('');
+    await expect(preview).toBeHidden();
+  });
+
   test('explains mistakes instead of guessing', async ({ page }) => {
     await run(page, 'move outline to archive');
     await expect(reply(page)).toContainText('Columns are: To do, Doing, Done.');

@@ -5,6 +5,7 @@ import {
 import { parseCommand } from './model/commands';
 import { cardDetails, positionText, sameName } from './model/describe';
 import { executeCommand } from './model/execute';
+import { previewCommand } from './model/preview';
 import { findColumn, findPerson } from './model/match';
 import { demoBoard, demoTeammateUpdate } from './model/seed';
 import { boardFromHash } from './model/share';
@@ -204,12 +205,17 @@ function Shell({ store }: { store: Handrail }) {
   }
 
   // ---- Commands ----------------------------------------------------------
-  function runCommand(text: string): boolean {
-    const cmd = parseCommand(text, {
+  function parse(text: string) {
+    return parseCommand(text, {
       today,
       isColumn: (t) => !!findColumn(board, t).match,
       isPerson: (t) => !!findPerson(peopleOn(board), t, me),
     });
+  }
+  const previewText = (text: string) => previewCommand(parse(text), board, { today, me });
+
+  function runCommand(text: string): boolean {
+    const cmd = parse(text);
     const r = executeCommand(cmd, board, { today, me });
     let reply = r.message;
     if (r.effect === 'undo') reply = undo();
@@ -444,7 +450,7 @@ function Shell({ store }: { store: Handrail }) {
       </main>
       {wide && (
         <aside className="activity" id="activity" aria-labelledby="activity-h">
-          <ActivityContent changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} />} />
+          <ActivityContent changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} preview={previewText} />} />
         </aside>
       )}
       </div>
@@ -460,12 +466,12 @@ function Shell({ store }: { store: Handrail }) {
           <button type="button" className="btn btn-secondary dock-activity" onClick={openActivity} aria-haspopup="dialog">
             Activity{unread > 0 && <span className="pill">{unread}<span className="sr-only"> new</span></span>}
           </button>
-          <CommandBar onRun={runCommand} lastReply={history.filter((h) => h.who === 'handrail').at(-1) ?? null} />
+          <CommandBar onRun={runCommand} preview={previewText} lastReply={history.filter((h) => h.who === 'handrail').at(-1) ?? null} />
         </div>
       )}
       {!wide && (
         <Modal open={activityOpen} onClose={closeActivity} title="Activity" full testId="activity-dialog">
-          <ActivityContent headless changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} />} />
+          <ActivityContent headless changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} preview={previewText} />} />
         </Modal>
       )}
 

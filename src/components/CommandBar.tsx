@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { canListen, listenOnce, type Listener } from '../lib/speech';
 import { useAnnounce } from './Announcer';
 import type { HistoryEntry } from './ActivityPanel';
+import type { Preview } from '../model/preview';
 
 const EXAMPLES = [
   'what changed',
@@ -11,13 +12,23 @@ const EXAMPLES = [
   'my tasks',
 ];
 
-export function CommandBar({ onRun, lastReply }: { onRun: (text: string) => boolean; lastReply?: HistoryEntry | null }) {
+export function CommandBar({
+  onRun,
+  lastReply,
+  preview,
+}: {
+  onRun: (text: string) => boolean;
+  lastReply?: HistoryEntry | null;
+  /** Explains what the typed text would do, before it runs. */
+  preview?: (text: string) => Preview | null;
+}) {
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const [voiceOk, setVoiceOk] = useState(false);
   const [focusWithin, setFocusWithin] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
   const showExamples = examplesOpen || (focusWithin && !text);
+  const willDo = text.trim() && preview ? preview(text) : null;
   const listener = useRef<Listener | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const { announce } = useAnnounce();
@@ -91,7 +102,7 @@ export function CommandBar({ onRun, lastReply }: { onRun: (text: string) => bool
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="e.g. move lab report to done"
-            aria-describedby="command-hint"
+            aria-describedby="command-preview command-hint"
           />
           {voiceOk && (
             <button
@@ -112,6 +123,15 @@ export function CommandBar({ onRun, lastReply }: { onRun: (text: string) => bool
             Do it
           </button>
         </div>
+        {/* Not a live region: it would be read on every keystroke. The input points to it with aria-describedby. */}
+        <p id="command-preview" className={`preview${willDo && !willDo.ok ? ' is-fail' : ''}`} data-testid="command-preview" hidden={!willDo}>
+          {willDo && (
+            <>
+              <span aria-hidden="true">→ </span>
+              {willDo.text}
+            </>
+          )}
+        </p>
         <div className="command-meta">
           <p id="command-hint" className="hint">
             Press <kbd>/</kbd> to come back here, <kbd>?</kbd> for help.

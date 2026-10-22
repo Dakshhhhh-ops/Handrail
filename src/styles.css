@@ -269,6 +269,8 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .command-input { flex: 1 1 auto; min-width: 0; font-size: 1.05rem; min-height: 48px; }
 .command-row .btn { flex: none; padding-inline: 0.75rem; }
 .mic.is-listening { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.preview { margin: 0; font-size: 0.95rem; color: var(--accent); font-weight: 700; overflow-wrap: anywhere; }
+.preview.is-fail { color: var(--danger); }
 .command-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 0.5rem; }
 .examples-toggle { padding-inline: 0.25rem; font-size: 0.92rem; }
 .command { position: relative; }
