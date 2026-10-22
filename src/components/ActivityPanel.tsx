@@ -29,7 +29,7 @@ function History({ entries }: { entries: HistoryEntry[] }) {
       <h3 id="history-h">Commands</h3>
       {entries.length === 0 ? (
         <p className="empty-note">
-          Type or say what you want below, like “what changed” or “move slides to done”. Your commands and Handrail’s replies show up here.
+          Type or say what you want below, like “what changed” or “move slides to done”. Handrail shows what it will do before you press Enter, and your commands and its replies stay here.
         </p>
       ) : (
         <ol className="chat" data-testid="history">

@@ -1,22 +1,24 @@
 # Handrail
 
-**A project board you can use without dragging, without seeing the screen, and without a mouse.**
+**A project board that tells you what changed, so you never have to hunt for it, with or without sight.**
 
-**Try it:** https://dakshhhhh-ops.github.io/Handrail/ (no account; it opens with a sample group project)
+**Try it:** https://dakshhhhh-ops.github.io/Handrail/ (no account; it opens with a sample group project. Click the board name and choose *Simulate teammates' changes* to see the main feature.)
 
-![The board after teammates' overnight changes, with a "Since you last looked" list of four changes, one marked "for you"](docs/changes.png)
+![The board with an Activity panel listing four changes since you last looked, one marked "for you", and the changed cards tagged on the board](docs/changes.png)
 
 ## The problem
 
-Student group projects run on boards like Trello, Notion and Jira, and those boards are built around one gesture: **dragging a card from one column to another**. That gesture shuts people out:
+In a group project, the hard part is often not doing your own task. It is **finding out what everyone else changed** since you last looked. On Trello, Notion or Jira you find out by scanning: you glance across the columns and notice that "Slides" moved to Done, or that a new card has your name on it. Activity feeds exist, but they are long lists of raw events, and written summaries are a paid AI add-on. Scanning is slow for everyone, and for a screen-reader user it means stepping through every card in every column to spot one difference.
+
+Handrail does the scanning for you. When a teammate sends their link, it writes every change as a plain sentence, puts the ones that involve you first, and tags those cards on the board. It's free, private and screen-reader-first.
+
+Moving cards without a mouse is not new (GitHub Projects and Jira support keyboard moves). Handrail includes it because the same people who can't scan a board often can't drag one either:
 
 - **Blind and low-vision students**, who use screen readers or magnifiers.
 - **Students with motor impairments** (tremor, RSI, one-handed use) who can't hold a mouse button steady while dragging.
 - **Keyboard-only and voice-control users.**
 
-WCAG 2.2 added a success criterion for this exact problem, [2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html): anything done by dragging must also be possible with a single pointer action or without a pointer.
-
-Even when the board itself can be used, a second barrier remains: **finding out what your teammates changed**. A sighted student glances at the board and sees that "Slides" moved to Done. A screen-reader user has to step through every card in every column to notice.
+WCAG 2.2 covers this in [2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html): anything done by dragging must also be possible without dragging.
 
 **Handrail's user:** Priya, a blind student working with NVDA on a group project. Her teammates Riya and Arjun use the board with a mouse.
 
@@ -24,9 +26,9 @@ Even when the board itself can be used, a second barrier remains: **finding out 
 
 | Instead of… | In Handrail you… |
 |---|---|
-| Dragging a card | Say or type **"move find sources to doing"**, press a **number key** (3 sends it to column 3), or **pick it up with Space** and move it with the arrow keys |
-| Scanning the board for changes | Open your teammate's link and hear **"Since you last looked: Riya assigned 'Email Dr. Mehta' to you. Arjun moved 'Write the script' to Doing…"** (changes that involve you come first) |
-| Reading every card to find deadlines | Ask **"what's due this week"**, **"anything overdue"** or **"my tasks"** |
+| Scanning the board for changes | Open your teammate's link and see or hear **"Since you last looked: Riya assigned 'Email Dr. Mehta' to you. Arjun moved 'Write the script' to Doing…"**. Changes that involve you come first, and changed cards are tagged on the board ("Riya · moved") |
+| Dragging a card | Type or say **"move find sources to doing"** (Handrail shows what it will do before you press Enter), press a **number key** (3 sends it to column 3), or **pick it up with Space** and move it with the arrow keys |
+| Reading every card to find deadlines | Ask **"what's due this week"**, **"anything overdue"** or **"my tasks"**, or press **Just mine** to see only your cards and the changes that involve you |
 | Fiddly date pickers | Type **"due next friday"**, **"in 3 days"** or **"oct 30"** |
 | Hoping you didn't break something | **Undo** any change with Ctrl+Z, the Undo button, or by saying "undo" |
 
@@ -55,7 +57,7 @@ Handrail has no backend and no accounts. **Share** packs the whole board into a 
 2. Riya opens it, makes changes, and shares her link back.
 3. Priya opens Riya's link. Handrail compares it with the version Priya last saw and turns every difference into a sentence, naming who made it. It moves focus to that list and announces how many changes there are.
 
-To see it without two devices, open **Boards & files → Simulate teammates' changes**.
+To see it without two devices, click the board name to open the board menu, then choose **Simulate teammates' changes**.
 
 ## Keyboard
 
@@ -74,8 +76,8 @@ To see it without two devices, open **Boards & files → Simulate teammates' cha
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm test             # 55 unit tests (parser, dates, change detection, imports)
-npm run test:e2e     # 22 browser tests incl. axe accessibility audit
+npm test             # 68 unit tests (parser, previews, dates, change detection, imports)
+npm run test:e2e     # 31 browser tests incl. axe accessibility audit
 npm run build        # static site in dist/
 ```
 
@@ -90,7 +92,7 @@ Every push to `main` runs type-checking, both test suites, and then deploys to G
   - `dates.ts` handles everyday dates ("next friday", "the 30th", "in two weeks").
   - `diff.ts` compares two versions of a board and describes each change as a sentence, with changes that involve you first.
   - `validate.ts` treats every shared link, imported file and saved board as untrusted: it limits sizes, fixes ids and drops broken cards.
-- **Testing:** Vitest (55 tests) and Playwright (22 tests), including a two-person handoff test that uses two separate browser contexts. **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog, and phone width, with zero violations.
+- **Testing:** Vitest (68 tests) and Playwright (31 tests), including a two-person handoff test that uses two separate browser contexts. **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog, and phone width, with zero violations.
 
 ## Limitations
 

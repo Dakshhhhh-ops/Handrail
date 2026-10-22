@@ -126,6 +126,9 @@ export function HelpDialog({ open, onClose }: { open: boolean; onClose: () => vo
   return (
     <Modal open={open} onClose={onClose} title="How to use Handrail" wide testId="help">
       <div className="help">
+        <p className="help-intro">
+          Handrail tells you what your teammates changed, so you never have to hunt for it. Everything else works by keyboard, by menu, or by typing or saying a sentence.
+        </p>
         <section aria-labelledby="h-say">
           <h3 id="h-say">Things you can type or say</h3>
           <table className="table">
