@@ -353,7 +353,7 @@ function Shell({ store }: { store: Handrail }) {
             </>
           )}
           <p className="viewer">
-            {me ? <>Signed in on this device as <strong>{me}</strong>.</> : <>No name set.</>}{' '}
+            {me ? <>On this device you are <strong>{me}</strong>.</> : <>No name set.</>}{' '}
             <button type="button" className="btn btn-quiet small" onClick={() => openDialog('settings')}>{me ? 'Change' : 'Set your name'}</button>
             <span className="sep" aria-hidden="true">·</span>
             {board.columns.length} columns, {cardCount} {cardCount === 1 ? 'card' : 'cards'}
