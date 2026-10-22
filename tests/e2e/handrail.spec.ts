@@ -256,6 +256,20 @@ test.describe('activity panel', () => {
     await expect(changes.getByRole('button', { name: 'Got it' })).toBeVisible();
   });
 
+  test('a written digest sums up the changes by person, and is what gets read aloud', async ({ page }) => {
+    await simulate(page);
+    const digest = page.getByTestId('digest');
+    await expect(digest).toHaveText(
+      'Riya gave you “Email Dr. Mehta about the extension”, moved “Design slides 4 to 8” to Done and added “Rehearse together on call” to To do. Arjun moved “Write the presentation script” to Doing.',
+    );
+    await page.getByRole('button', { name: 'Read aloud' }).click();
+    await expect(live(page)).toHaveText(/^4 changes since you last looked\. Riya gave you/);
+    await page.getByRole('button', { name: 'Just mine' }).click();
+    await expect(digest).toHaveText('Riya gave you “Email Dr. Mehta about the extension”.');
+    await run(page, 'what changed');
+    await expect(reply(page)).toContainText('1 change since you last looked. Riya gave you');
+  });
+
   test('cards teammates changed are marked on the board until you press Got it', async ({ page }) => {
     await simulate(page);
     const email = cardIn(page, 'To do', 'Email Dr. Mehta');

@@ -375,6 +375,7 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .changes.has-news { border: 2px solid var(--news); }
 .news-count { margin: 0 0 0.6rem; display: flex; align-items: baseline; gap: 0.5rem; line-height: 1.25; }
 .news-num { font-family: var(--mono); font-weight: 700; font-size: 2.6rem; line-height: 1; color: var(--news-text); font-variant-numeric: tabular-nums; }
+.digest { margin: 0 0 0.75rem; font-size: 1.02rem; line-height: 1.55; }
 .changes-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.6rem; }
 .changes-collapsed { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .change-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.35rem; }

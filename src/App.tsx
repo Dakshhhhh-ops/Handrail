@@ -6,6 +6,7 @@ import { parseCommand } from './model/commands';
 import { cardDetails, positionText, sameName } from './model/describe';
 import { executeCommand } from './model/execute';
 import { previewCommand } from './model/preview';
+import { summarize } from './model/summary';
 import { findColumn, findPerson } from './model/match';
 import { demoBoard } from './model/seed';
 import { docFromHash } from './model/share';
@@ -249,9 +250,12 @@ function Shell({ store }: { store: Handrail }) {
     return r.ok;
   }
 
+  /** The spoken digest: a count, then the grouped summary ("Riya moved 2 cards to Done…"). */
   function readChanges() {
-    const n = store.changes.length;
-    return `${n} ${n === 1 ? 'change' : 'changes'} since you last looked. ${store.changes.map((c) => (c.forYou ? `For you: ${c.text}` : c.text)).join(' ')}`;
+    const list = justMine ? store.changes.filter((c) => c.forYou) : store.changes;
+    const n = list.length;
+    if (n === 0) return justMine ? 'Nothing that involves you has changed since you last looked.' : 'Nothing has changed since you last looked.';
+    return `${n} ${n === 1 ? 'change' : 'changes'} since you last looked. ${summarize(list, me, today)}`;
   }
 
   // ---- Card actions ------------------------------------------------------
@@ -418,6 +422,7 @@ function Shell({ store }: { store: Handrail }) {
         focusCardLater(id);
         setHighlightId(id);
       }}
+      digest={summarize(justMine ? store.changes.filter((c) => c.forYou) : store.changes, me, today)}
       onReadAll={() => announce(readChanges())}
       onDone={() => {
         store.markSeen();

@@ -14,6 +14,10 @@ export interface Change {
   forYou: boolean;
   /** Who made the change, when known. */
   by?: string | null;
+  /** The card's title, for grouping changes into a summary. */
+  title?: string;
+  /** Where it went: the column for moves and additions, the person for assignments, the date for due dates. */
+  to?: string | null;
 }
 
 /**
@@ -53,37 +57,37 @@ export function diffBoards(before: Board, after: Board, me: string | null, today
         if (now.due) extra.push(describeDue(now.due, today).spoken);
         if (now.assignee) extra.push(`assigned to ${whoLabel(now.assignee, me)}`);
         const who = author('alive');
-        push({ kind: 'added', cardId: id, text: `${by(who)} added “${now.title}” to ${col.title}${extra.length ? `, ${extra.join(', ')}` : ''}.`, forYou }, who);
+        push({ kind: 'added', cardId: id, title: now.title, to: col.title, text: `${by(who)} added “${now.title}” to ${col.title}${extra.length ? `, ${extra.join(', ')}` : ''}.`, forYou }, who);
         continue;
       }
       if (was.title !== now.title) {
         const who = author('title');
-        push({ kind: 'renamed', cardId: id, text: `${by(who)} renamed “${was.title}” to “${now.title}”.`, forYou }, who);
+        push({ kind: 'renamed', cardId: id, title: now.title, to: now.title, text: `${by(who)} renamed “${was.title}” to “${now.title}”.`, forYou }, who);
       }
 
       const oldLoc = locate(before, id);
       if (oldLoc && oldLoc.column.id !== col.id) {
         const fromName = afterCols.get(oldLoc.column.id)?.title ?? oldLoc.column.title;
         const who = author('place');
-        push({ kind: 'moved', cardId: id, text: `${by(who)} moved “${now.title}” from ${fromName} to ${col.title}.`, forYou }, who);
+        push({ kind: 'moved', cardId: id, title: now.title, to: col.title, text: `${by(who)} moved “${now.title}” from ${fromName} to ${col.title}.`, forYou }, who);
       }
       if (!sameName(was.assignee, now.assignee) && (was.assignee || now.assignee)) {
         const who = author('assignee');
         const text = now.assignee
           ? `${by(who)} assigned “${now.title}” to ${whoLabel(now.assignee, me)}.`
           : `${by(who)} unassigned “${now.title}”${was.assignee ? ` (was ${whoLabel(was.assignee, me)})` : ''}.`;
-        push({ kind: 'assigned', cardId: id, text, forYou: forYou || mine(was.assignee) }, who);
+        push({ kind: 'assigned', cardId: id, title: now.title, to: now.assignee, text, forYou: forYou || mine(was.assignee) }, who);
       }
       if (was.due !== now.due) {
         const who = author('due');
         const text = now.due
           ? `${by(who)} set “${now.title}” ${describeDue(now.due, today).spoken}.`
           : `${by(who)} removed the due date from “${now.title}”.`;
-        push({ kind: 'due', cardId: id, text, forYou }, who);
+        push({ kind: 'due', cardId: id, title: now.title, to: now.due, text, forYou }, who);
       }
       if (was.notes.trim() !== now.notes.trim()) {
         const who = author('notes');
-        push({ kind: 'notes', cardId: id, text: `${by(who)} updated the notes on “${now.title}”.`, forYou }, who);
+        push({ kind: 'notes', cardId: id, title: now.title, text: `${by(who)} updated the notes on “${now.title}”.`, forYou }, who);
       }
     }
   }
@@ -91,7 +95,7 @@ export function diffBoards(before: Board, after: Board, me: string | null, today
   for (const id of Object.keys(before.cards)) {
     if (!after.cards[id] && locate(before, id)) {
       const was = before.cards[id];
-      out.push({ kind: 'removed', text: `“${was.title}” was removed.`, forYou: mine(was.assignee) });
+      out.push({ kind: 'removed', title: was.title, text: `“${was.title}” was removed.`, forYou: mine(was.assignee) });
     }
   }
 
@@ -117,6 +121,7 @@ export function describeConflicts(conflicts: Conflict[], board: Board): Change[]
     return {
       kind: 'conflict' as const,
       cardId: c.cardId && board.cards[c.cardId] ? c.cardId : undefined,
+      title: title ?? undefined,
       text: `You and ${other} both ${what} at the same time. Handrail ${kept}.`,
       forYou: true,
       by: c.other,
