@@ -1,0 +1,422 @@
+/**
+ * Conflict-free replicated board (a state-based CRDT).
+ *
+ * Every editable thing on a board is a last-writer-wins register that remembers
+ * its value, a Lamport clock, the device ("actor") that wrote it and that
+ * person's name. Two copies of a board merge by keeping, for each register, the
+ * write with the higher (clock, actor). That merge is commutative, associative
+ * and idempotent, so teammates who swap share links in any order, any number of
+ * times, always end up with the same board. No server decides who wins.
+ *
+ * Card and column order uses fractional indexing: each item has a string key
+ * and the list is sorted by key, so moving one card writes one register instead
+ * of renumbering the whole column (the approach Figma and Linear describe).
+ *
+ * The rest of the app keeps working with plain `Board` views: `materialize`
+ * turns a document into a view, and `commit` turns an edited view back into the
+ * smallest set of register writes.
+ */
+import { generateKeyBetween } from 'fractional-indexing';
+import { isISODate } from './dates';
+import type { Board, Card, Column } from './types';
+
+export interface Reg<T> {
+  /** The value. */
+  v: T;
+  /** Lamport clock of the write. */
+  c: number;
+  /** Actor (device) id of the writer; breaks ties between equal clocks. */
+  a: string;
+  /** Display name of the person who wrote it, for "Riya moved…". */
+  by: string | null;
+}
+
+export interface Place {
+  col: string;
+  pos: string;
+}
+
+export interface CardRec {
+  title: Reg<string>;
+  notes: Reg<string>;
+  due: Reg<string | null>;
+  assignee: Reg<string | null>;
+  place: Reg<Place>;
+  alive: Reg<boolean>;
+}
+
+export interface ColRec {
+  title: Reg<string>;
+  pos: Reg<string>;
+  alive: Reg<boolean>;
+}
+
+/** Highest clock seen from each actor. */
+export type VersionVector = Record<string, number>;
+
+export interface Doc {
+  kind: 'handrail-doc';
+  v: 2;
+  id: string;
+  title: Reg<string>;
+  cols: Record<string, ColRec>;
+  cards: Record<string, CardRec>;
+  clock: number;
+  vv: VersionVector;
+}
+
+export type CardField = 'title' | 'notes' | 'due' | 'assignee';
+export const CARD_FIELDS: CardField[] = ['title', 'notes', 'due', 'assignee'];
+
+// ---- Registers ---------------------------------------------------------------
+
+/** True when write x should win over write y. A total order, so every replica agrees. */
+export function wins(x: Reg<unknown>, y: Reg<unknown>): boolean {
+  return x.c > y.c || (x.c === y.c && x.a > y.a);
+}
+
+function pick<T>(x: Reg<T>, y: Reg<T>): Reg<T> {
+  return wins(y, x) ? y : x;
+}
+
+const NONE = { c: 0, a: '', by: null } as const;
+
+export function emptyDoc(id: string): Doc {
+  return { kind: 'handrail-doc', v: 2, id, title: { v: '', ...NONE }, cols: {}, cards: {}, clock: 0, vv: {} };
+}
+
+// ---- Merge -------------------------------------------------------------------
+
+function mergeCol(x: ColRec | undefined, y: ColRec | undefined): ColRec {
+  if (!x) return y!;
+  if (!y) return x;
+  return { title: pick(x.title, y.title), pos: pick(x.pos, y.pos), alive: pick(x.alive, y.alive) };
+}
+
+function mergeCard(x: CardRec | undefined, y: CardRec | undefined): CardRec {
+  if (!x) return y!;
+  if (!y) return x;
+  return {
+    title: pick(x.title, y.title),
+    notes: pick(x.notes, y.notes),
+    due: pick(x.due, y.due),
+    assignee: pick(x.assignee, y.assignee),
+    place: pick(x.place, y.place),
+    alive: pick(x.alive, y.alive),
+  };
+}
+
+/** Joins two replicas of the same board. Order of arguments never matters. */
+export function mergeDocs(a: Doc, b: Doc): Doc {
+  if (a.id !== b.id) throw new Error('Cannot merge two different boards');
+  const cols: Record<string, ColRec> = {};
+  for (const id of new Set([...Object.keys(a.cols), ...Object.keys(b.cols)])) cols[id] = mergeCol(a.cols[id], b.cols[id]);
+  const cards: Record<string, CardRec> = {};
+  for (const id of new Set([...Object.keys(a.cards), ...Object.keys(b.cards)])) cards[id] = mergeCard(a.cards[id], b.cards[id]);
+  const vv: VersionVector = { ...a.vv };
+  for (const [actor, c] of Object.entries(b.vv)) vv[actor] = Math.max(vv[actor] ?? 0, c);
+  return { kind: 'handrail-doc', v: 2, id: a.id, title: pick(a.title, b.title), cols, cards, clock: Math.max(a.clock, b.clock), vv };
+}
+
+// ---- Materialize -----------------------------------------------------------
+
+const byKey = (ka: string, ia: string, kb: string, ib: string) => (ka < kb ? -1 : ka > kb ? 1 : ia < ib ? -1 : ia > ib ? 1 : 0);
+
+function latest(rec: CardRec): Reg<unknown> {
+  return [rec.title, rec.notes, rec.due, rec.assignee, rec.place, rec.alive].reduce((m, r) => (wins(r, m) ? r : m));
+}
+
+/** Turns a document into the plain board the UI works with. */
+export function materialize(doc: Doc): Board {
+  const allCols = Object.entries(doc.cols).sort(([ia, a], [ib, b]) => byKey(a.pos.v, ia, b.pos.v, ib));
+  const alive = allCols.filter(([, r]) => r.alive.v);
+  const columns: Column[] = alive.map(([id, r]) => ({ id, title: r.title.v, cardIds: [] }));
+  const index = new Map(columns.map((c, i) => [c.id, i]));
+
+  // Cards whose column was deleted (or never arrived) show in the nearest
+  // living column to its left, so nothing is ever lost.
+  const home = (colId: string): number => {
+    const direct = index.get(colId);
+    if (direct !== undefined) return direct;
+    const at = allCols.findIndex(([id]) => id === colId);
+    if (at < 0) return 0;
+    for (let i = at - 1; i >= 0; i--) {
+      const j = index.get(allCols[i][0]);
+      if (j !== undefined) return j;
+    }
+    return 0;
+  };
+
+  const cards: Record<string, Card> = {};
+  if (columns.length) {
+    const placed = Object.entries(doc.cards)
+      .filter(([, r]) => r.alive.v)
+      .sort(([ia, a], [ib, b]) => byKey(a.place.v.pos, ia, b.place.v.pos, ib));
+    for (const [id, r] of placed) {
+      const last = latest(r);
+      cards[id] = {
+        id,
+        title: r.title.v,
+        notes: r.notes.v,
+        due: r.due.v,
+        assignee: r.assignee.v,
+        lastEditedBy: last.by,
+        updatedAt: last.c,
+        fieldBy: { title: r.title.by, notes: r.notes.by, due: r.due.by, assignee: r.assignee.by, place: r.place.by, alive: r.alive.by },
+      };
+      columns[home(r.place.v.col)].cardIds.push(id);
+    }
+  }
+  return { id: doc.id, title: doc.title.v || 'Untitled board', columns, cards, updatedAt: doc.clock };
+}
+
+// ---- Commit ----------------------------------------------------------------
+
+/** Indices of a longest strictly increasing run of keys (nulls are skipped). O(n log n). */
+export function lisIndices(keys: (string | null)[]): Set<number> {
+  const tails: number[] = [];
+  const prev: number[] = new Array(keys.length).fill(-1);
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (k === null) continue;
+    let lo = 0;
+    let hi = tails.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (keys[tails[mid]]! < k) lo = mid + 1;
+      else hi = mid;
+    }
+    if (lo > 0) prev[i] = tails[lo - 1];
+    tails[lo] = i;
+  }
+  const keep = new Set<number>();
+  for (let i = tails.length ? tails[tails.length - 1] : -1; i >= 0; i = prev[i]) keep.add(i);
+  return keep;
+}
+
+/**
+ * Gives every item in `order` a sort key. Items whose existing keys are already
+ * in order keep them; only the others get new keys between their neighbours.
+ */
+export function assignKeys(existing: (string | null)[]): string[] {
+  const keep = lisIndices(existing);
+  const out: string[] = [];
+  for (let i = 0; i < existing.length; i++) {
+    if (keep.has(i)) {
+      out.push(existing[i]!);
+      continue;
+    }
+    let next: string | null = null;
+    for (let j = i + 1; j < existing.length; j++) {
+      if (keep.has(j)) {
+        next = existing[j];
+        break;
+      }
+    }
+    out.push(generateKeyBetween(i > 0 ? out[i - 1] : null, next));
+  }
+  return out;
+}
+
+/**
+ * Records the difference between the document and an edited board view as new
+ * register writes by `actor`. Returns the same document when nothing changed.
+ */
+export function commit(doc: Doc, after: Board, actor: string, by: string | null): Doc {
+  const c = doc.clock + 1;
+  const reg = <T,>(v: T): Reg<T> => ({ v, c, a: actor, by });
+  const next: Doc = { ...doc, cols: { ...doc.cols }, cards: { ...doc.cards } };
+  let dirty = false;
+
+  if (doc.title.v !== after.title) {
+    next.title = reg(after.title);
+    dirty = true;
+  }
+
+  // Columns
+  const colKeys = assignKeys(after.columns.map((col) => (doc.cols[col.id]?.alive.v ? doc.cols[col.id].pos.v : null)));
+  after.columns.forEach((col, i) => {
+    const rec = doc.cols[col.id];
+    if (!rec) {
+      next.cols[col.id] = { title: reg(col.title), pos: reg(colKeys[i]), alive: reg(true) };
+      dirty = true;
+      return;
+    }
+    const patch = { ...rec };
+    let changed = false;
+    if (!rec.alive.v) { patch.alive = reg(true); changed = true; }
+    if (rec.title.v !== col.title) { patch.title = reg(col.title); changed = true; }
+    if (rec.pos.v !== colKeys[i]) { patch.pos = reg(colKeys[i]); changed = true; }
+    if (changed) { next.cols[col.id] = patch; dirty = true; }
+  });
+  const keptCols = new Set(after.columns.map((col) => col.id));
+  for (const [id, rec] of Object.entries(doc.cols)) {
+    if (rec.alive.v && !keptCols.has(id)) {
+      next.cols[id] = { ...rec, alive: reg(false) };
+      dirty = true;
+    }
+  }
+
+  // Cards
+  const seenCards = new Set<string>();
+  for (const col of after.columns) {
+    const keys = assignKeys(
+      col.cardIds.map((id) => {
+        const rec = doc.cards[id];
+        return rec && rec.alive.v && rec.place.v.col === col.id ? rec.place.v.pos : null;
+      }),
+    );
+    col.cardIds.forEach((id, i) => {
+      seenCards.add(id);
+      const card = after.cards[id];
+      if (!card) return;
+      const place: Place = { col: col.id, pos: keys[i] };
+      const rec = doc.cards[id];
+      if (!rec) {
+        next.cards[id] = {
+          title: reg(card.title), notes: reg(card.notes), due: reg(card.due), assignee: reg(card.assignee),
+          place: reg(place), alive: reg(true),
+        };
+        dirty = true;
+        return;
+      }
+      const patch: CardRec = { ...rec };
+      let changed = false;
+      if (!rec.alive.v) { patch.alive = reg(true); changed = true; }
+      for (const f of CARD_FIELDS) {
+        if (rec[f].v !== card[f]) {
+          (patch[f] as Reg<string | null>) = reg(card[f]);
+          changed = true;
+        }
+      }
+      if (rec.place.v.col !== place.col || rec.place.v.pos !== place.pos) { patch.place = reg(place); changed = true; }
+      if (changed) { next.cards[id] = patch; dirty = true; }
+    });
+  }
+  for (const [id, rec] of Object.entries(doc.cards)) {
+    if (rec.alive.v && !seenCards.has(id)) {
+      next.cards[id] = { ...rec, alive: reg(false) };
+      dirty = true;
+    }
+  }
+
+  if (!dirty) return doc;
+  next.clock = c;
+  next.vv = { ...doc.vv, [actor]: c };
+  return next;
+}
+
+/** A brand-new document holding `board`, written by `actor`. */
+export function docFromBoard(board: Board, actor: string, by: string | null): Doc {
+  return commit(emptyDoc(board.id), board, actor, by);
+}
+
+// ---- Conflicts ---------------------------------------------------------------
+
+export interface Conflict {
+  cardId: string | null;
+  field: CardField | 'place' | 'alive' | 'title';
+  /** Whose write was kept. */
+  kept: 'yours' | 'theirs';
+  /** Name on the other side of the conflict. */
+  other: string | null;
+}
+
+/**
+ * Finds registers that you and a teammate changed without seeing each other's
+ * write. The merge still decides automatically; this only lets Handrail say so
+ * in plain words instead of silently dropping someone's change.
+ */
+export function findConflicts(local: Doc, remote: Doc, me: string): Conflict[] {
+  const out: Conflict[] = [];
+  const check = <T,>(cardId: string | null, field: Conflict['field'], mine: Reg<T> | undefined, theirs: Reg<T> | undefined) => {
+    if (!mine || !theirs || mine.a !== me || theirs.a === me) return;
+    const theyMissedMine = mine.c > (remote.vv[me] ?? 0);
+    const iMissedTheirs = theirs.c > (local.vv[theirs.a] ?? 0);
+    if (!theyMissedMine || !iMissedTheirs) return;
+    if (JSON.stringify(mine.v) === JSON.stringify(theirs.v)) return;
+    out.push({ cardId, field, kept: wins(theirs, mine) ? 'theirs' : 'yours', other: theirs.by });
+  };
+  check(null, 'title', local.title, remote.title);
+  for (const [id, mine] of Object.entries(local.cards)) {
+    const theirs = remote.cards[id];
+    if (!theirs) continue;
+    for (const f of CARD_FIELDS) check(id, f, mine[f], theirs[f]);
+    check(id, 'place', mine.place, theirs.place);
+    check(id, 'alive', mine.alive, theirs.alive);
+  }
+  return out;
+}
+
+// ---- Validation of untrusted documents (links, files, storage) ------------
+
+const ID = /^[A-Za-z0-9_-]{1,64}$/;
+const ACTOR = /^[A-Za-z0-9_-]{0,40}$/;
+const POS = /^[0-9A-Za-z]{1,64}$/;
+
+function validKey(k: unknown): k is string {
+  if (typeof k !== 'string' || !POS.test(k)) return false;
+  try {
+    generateKeyBetween(k, null);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function vReg<T>(raw: unknown, check: (v: unknown) => v is T): Reg<T> | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.c !== 'number' || !Number.isInteger(r.c) || r.c < 0 || r.c > 1e12) return null;
+  if (typeof r.a !== 'string' || !ACTOR.test(r.a)) return null;
+  if (!(r.by === null || (typeof r.by === 'string' && r.by.length <= 60))) return null;
+  if (!check(r.v)) return null;
+  return { v: r.v, c: r.c, a: r.a, by: (r.by as string | null) ?? null };
+}
+
+const str = (max: number) => (v: unknown): v is string => typeof v === 'string' && v.length <= max;
+const optName = (v: unknown): v is string | null => v === null || (typeof v === 'string' && v.length <= 60);
+const optDue = (v: unknown): v is string | null => v === null || (typeof v === 'string' && isISODate(v));
+const bool = (v: unknown): v is boolean => typeof v === 'boolean';
+const place = (v: unknown): v is Place => {
+  const p = v as Place;
+  return !!p && typeof p === 'object' && typeof p.col === 'string' && ID.test(p.col) && validKey(p.pos);
+};
+
+/** Accepts a document from an untrusted source, or returns null. Broken entries are dropped. */
+export function validateDoc(raw: unknown): Doc | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  if (r.kind !== 'handrail-doc' || r.v !== 2 || typeof r.id !== 'string' || !ID.test(r.id)) return null;
+  const title = vReg(r.title, str(200));
+  if (!title) return null;
+  const cols: Record<string, ColRec> = {};
+  for (const [id, raw] of Object.entries((r.cols as Record<string, unknown>) ?? {}).slice(0, 40)) {
+    const x = raw as Record<string, unknown>;
+    if (!ID.test(id) || !x) continue;
+    const t = vReg(x.title, str(200)), p = vReg(x.pos, validKey), al = vReg(x.alive, bool);
+    if (t && p && al) cols[id] = { title: t, pos: p, alive: al };
+  }
+  const cards: Record<string, CardRec> = {};
+  for (const [id, raw] of Object.entries((r.cards as Record<string, unknown>) ?? {}).slice(0, 2000)) {
+    const x = raw as Record<string, unknown>;
+    if (!ID.test(id) || !x) continue;
+    const rec = {
+      title: vReg(x.title, str(200)), notes: vReg(x.notes, str(5000)), due: vReg(x.due, optDue),
+      assignee: vReg(x.assignee, optName), place: vReg(x.place, place), alive: vReg(x.alive, bool),
+    };
+    if (Object.values(rec).every(Boolean)) cards[id] = rec as CardRec;
+  }
+  const vv: VersionVector = {};
+  for (const [a, c] of Object.entries((r.vv as Record<string, unknown>) ?? {}).slice(0, 200)) {
+    if (ACTOR.test(a) && typeof c === 'number' && Number.isInteger(c) && c >= 0) vv[a] = c;
+  }
+  // The clock must be at least every write we hold, or later local writes could lose.
+  let clock = typeof r.clock === 'number' && Number.isInteger(r.clock) ? r.clock : 0;
+  const regs = [title, ...Object.values(cols).flatMap((x) => [x.title, x.pos, x.alive]), ...Object.values(cards).flatMap((x) => [x.title, x.notes, x.due, x.assignee, x.place, x.alive])];
+  for (const g of regs) {
+    clock = Math.max(clock, g.c);
+    if (g.a) vv[g.a] = Math.max(vv[g.a] ?? 0, g.c);
+  }
+  return { kind: 'handrail-doc', v: 2, id: r.id, title, cols, cards, clock, vv };
+}

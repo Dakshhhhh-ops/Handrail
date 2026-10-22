@@ -8,6 +8,8 @@ export interface Card {
   /** Name of the person who last changed this card, if known. */
   lastEditedBy: string | null;
   updatedAt: number;
+  /** Who last wrote each part of the card, when known (from the shared document). */
+  fieldBy?: Partial<Record<'title' | 'notes' | 'due' | 'assignee' | 'place' | 'alive', string | null>>;
 }
 
 export interface Column {
