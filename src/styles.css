@@ -102,6 +102,8 @@ q { quotes: '“' '”'; }
 }
 [tabindex='-1']:focus:not(:focus-visible) { outline: none; }
 
+[hidden] { display: none !important; }
+
 .sr-only {
   position: absolute !important;
   width: 1px; height: 1px;
@@ -177,12 +179,29 @@ q { quotes: '“' '”'; }
 
 main { flex: 1; padding: 1.25rem 1rem 2rem; max-width: 1500px; width: 100%; margin: 0 auto; }
 
-.board-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; margin-bottom: 1rem; }
-.board-head h1 { font-size: 1.75rem; }
-.viewer { flex-basis: 100%; margin: 0; color: var(--muted); }
-.viewer .sep { margin: 0 0.5rem; }
-.rename-form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
-.rename-form input { font-size: 1.4rem; }
+.board-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; margin-bottom: 0.75rem; }
+.board-head h1 { font-size: 1.5rem; min-width: 0; }
+.board-name {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: var(--radius);
+  min-height: 44px;
+  padding: 0.15rem 0.5rem;
+  margin-left: -0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.board-name:hover { border-color: var(--border-strong); }
+.board-name svg { flex: none; color: var(--muted); }
+.board-counts { margin: 0; color: var(--muted); }
+.board-head .toggle { margin-left: auto; }
 
 /* ---- Forms -------------------------------------------------------------- */
 input, select, textarea {
@@ -250,8 +269,25 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .command-input { flex: 1 1 auto; min-width: 0; font-size: 1.05rem; min-height: 48px; }
 .command-row .btn { flex: none; padding-inline: 0.75rem; }
 .mic.is-listening { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
-.examples { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-top: 0.5rem; }
-.examples-label { color: var(--muted); font-size: 0.95rem; }
+.command-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 0.5rem; }
+.examples-toggle { padding-inline: 0.25rem; font-size: 0.92rem; }
+.command { position: relative; }
+/* Examples float above the command box like a suggestion list, so showing them never shifts the layout. */
+.examples {
+  position: absolute;
+  left: -1rem;
+  right: -1rem;
+  bottom: calc(100% + 0.75rem);
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -6px 14px rgb(0 0 0 / 0.08);
+}
 .chip {
   font: inherit; letter-spacing: inherit;
   font-size: 0.92rem;
@@ -301,7 +337,7 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 }
 .dock .command { grid-column: 1 / -1; }
 .dock-activity { grid-column: 2; grid-row: 1; }
-.dock .hint, .dock .examples { display: none; }
+.dock .command-meta, .dock .examples { display: none; }
 .dock .command-form { gap: 0.25rem; }
 
 /* ---- Changes ("Since you last looked") ---------------------------------- */
@@ -446,7 +482,7 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 
 @media (max-width: 640px) {
   main { padding: 1rem; }
-  .board-head h1 { font-size: 1.4rem; }
+  .board-head h1 { font-size: 1.25rem; }
   .toolbar .btn { flex: 1 1 auto; }
   .board { flex-direction: column; align-items: stretch; min-width: 0; }
   .column { flex-basis: auto; max-width: none; min-width: 0; }

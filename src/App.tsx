@@ -51,8 +51,6 @@ function Shell({ store }: { store: Handrail }) {
   const [editor, setEditor] = useState<{ cardId: string | null; columnId: string } | null>(null);
   const [columnDlg, setColumnDlg] = useState<string | null>(null);
   const [dialog, setDialog] = useState<DialogName>(null);
-  const [renaming, setRenaming] = useState(false);
-  const [boardTitle, setBoardTitle] = useState(board.title);
   const [focusTarget, setFocusTarget] = useState<{ id: string; n: number } | null>(null);
   const lastFocus = useRef<HTMLElement | null>(null);
   const justOpened = useRef<string | null>(null);
@@ -106,7 +104,6 @@ function Shell({ store }: { store: Handrail }) {
 
   useEffect(() => {
     document.title = `${board.title} · Handrail`;
-    setBoardTitle(board.title);
   }, [board.title]);
 
   // ---- Opening a shared link ------------------------------------------------
@@ -396,7 +393,6 @@ function Shell({ store }: { store: Handrail }) {
             <span aria-hidden="true">↷</span> Redo
           </button>
           <button type="button" className="btn btn-secondary" onClick={() => openDialog('share')}>Share</button>
-          <button type="button" className="btn btn-secondary" onClick={() => openDialog('boards')}>Boards &amp; files</button>
           <button type="button" className="btn btn-secondary" onClick={() => openDialog('settings')}>Settings</button>
           <button type="button" className="btn btn-secondary" onClick={() => openDialog('help')}>Help</button>
         </nav>
@@ -405,33 +401,15 @@ function Shell({ store }: { store: Handrail }) {
       <div className={`layout ${wide ? 'is-wide' : 'is-narrow'}`}>
       <main id="main">
         <div className="board-head">
-          {renaming ? (
-            <form className="rename-form" onSubmit={(e) => {
-              e.preventDefault();
-              store.apply(renameBoard(board, boardTitle), 'rename the board');
-              setRenaming(false);
-              announce(`Board renamed to “${boardTitle.trim()}”.`);
-              focusLater('rename-board');
-            }}>
-              <label htmlFor="board-title-input" className="sr-only">Board name</label>
-              <input id="board-title-input" value={boardTitle} onChange={(e) => setBoardTitle(e.target.value)} maxLength={200} autoFocus
-                onKeyDown={(e) => { if (e.key === 'Escape') { setRenaming(false); setBoardTitle(board.title); focusLater('rename-board'); } }} />
-              <button type="submit" className="btn btn-primary">Save</button>
-              <button type="button" className="btn btn-secondary" onClick={() => { setRenaming(false); setBoardTitle(board.title); focusLater('rename-board'); }}>Cancel</button>
-            </form>
-          ) : (
-            <>
-              <h1>{board.title}</h1>
-              <button type="button" id="rename-board" className="btn btn-quiet small" onClick={() => setRenaming(true)}>
-                Rename<span className="sr-only"> board</span>
-              </button>
-            </>
-          )}
-          <p className="viewer">
-            {me ? <>On this device you are <strong>{me}</strong>.</> : <>No name set.</>}{' '}
-            <button type="button" className="btn btn-quiet small" onClick={() => openDialog('settings')}>{me ? 'Change' : 'Set your name'}</button>
-            <span className="sep" aria-hidden="true">·</span>
-            {board.columns.length} columns, {cardCount} {cardCount === 1 ? 'card' : 'cards'}
+          <h1>
+            <button type="button" id="board-switcher" className="board-name" onClick={() => openDialog('boards')} aria-haspopup="dialog" aria-describedby="board-switcher-hint">
+              {board.title}
+              <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+            </button>
+          </h1>
+          <span id="board-switcher-hint" hidden>Switch, rename, import or export boards</span>
+          <p className="board-counts">
+            {board.columns.length} columns · {cardCount} {cardCount === 1 ? 'card' : 'cards'}
           </p>
           {justMineButton}
         </div>
@@ -539,6 +517,10 @@ function Shell({ store }: { store: Handrail }) {
         onDelete={(id) => { store.deleteBoard(id); setDialog(null); announce('Board deleted.'); focusLater('command-input'); }}
         onImported={importBoard}
         onTeammateDemo={simulateTeammates}
+        onRename={(title) => {
+          store.apply(renameBoard(board, title), 'rename the board');
+          announce(`Board renamed to “${title}”.`);
+        }}
         onResetDemo={() => { store.createBoard(demoBoard(today)); setDialog(null); announce('The sample board is back to its starting state.'); focusLater('command-input'); }}
       />
     </>

@@ -223,7 +223,7 @@ function download(filename: string, text: string, type: string) {
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'board';
 
 export function BoardsDialog({
-  open, onClose, board, boards, today, onSwitch, onCreate, onDelete, onImported, onTeammateDemo, onResetDemo,
+  open, onClose, board, boards, today, onSwitch, onCreate, onDelete, onImported, onTeammateDemo, onResetDemo, onRename,
 }: {
   open: boolean;
   onClose: () => void;
@@ -236,8 +236,11 @@ export function BoardsDialog({
   onImported: (b: Board, source: string) => void;
   onTeammateDemo: () => void;
   onResetDemo: () => void;
+  onRename: (title: string) => void;
 }) {
   const [title, setTitle] = useState('');
+  const [rename, setRename] = useState(board.title);
+  useEffect(() => setRename(board.title), [open, board.title]);
   const [status, setStatus] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   useEffect(() => { setStatus(''); setConfirmDelete(false); }, [open]);
@@ -280,6 +283,16 @@ export function BoardsDialog({
     <Modal open={open} onClose={onClose} title="Boards & files" wide testId="boards">
       <div className="boards-grid">
         <section aria-labelledby="b-yours">
+          <form className="form inline-form" onSubmit={(e) => {
+            e.preventDefault();
+            if (rename.trim() && rename.trim() !== board.title) onRename(rename.trim());
+          }}>
+            <div className="field">
+              <label htmlFor="rename-board">Name of this board</label>
+              <input id="rename-board" value={rename} onChange={(e) => setRename(e.target.value)} maxLength={200} required data-autofocus />
+            </div>
+            <button type="submit" className="btn btn-secondary">Rename</button>
+          </form>
           <h3 id="b-yours">Your boards</h3>
           <ul className="board-list">
             {boards.map((b) => (

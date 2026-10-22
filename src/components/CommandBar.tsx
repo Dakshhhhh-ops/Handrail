@@ -15,6 +15,9 @@ export function CommandBar({ onRun, lastReply }: { onRun: (text: string) => bool
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
   const [voiceOk, setVoiceOk] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
+  const [examplesOpen, setExamplesOpen] = useState(false);
+  const showExamples = examplesOpen || (focusWithin && !text);
   const listener = useRef<Listener | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const { announce } = useAnnounce();
@@ -65,7 +68,14 @@ export function CommandBar({ onRun, lastReply }: { onRun: (text: string) => bool
   }
 
   return (
-    <section className="command" aria-labelledby="command-label">
+    <section
+      className="command"
+      aria-labelledby="command-label"
+      onFocus={() => setFocusWithin(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setFocusWithin(false);
+      }}
+    >
       <form onSubmit={submit} className="command-form" role="search" aria-label="Command">
         <label id="command-label" htmlFor="command-input" className="command-label">
           Tell Handrail what to do
@@ -102,14 +112,30 @@ export function CommandBar({ onRun, lastReply }: { onRun: (text: string) => bool
             Do it
           </button>
         </div>
-        <p id="command-hint" className="hint">
-          Type or speak a sentence. Press <kbd>/</kbd> to come back here, <kbd>?</kbd> for help.
-        </p>
+        <div className="command-meta">
+          <p id="command-hint" className="hint">
+            Press <kbd>/</kbd> to come back here, <kbd>?</kbd> for help.
+          </p>
+          <button
+            type="button"
+            className="btn btn-quiet examples-toggle"
+            aria-expanded={showExamples}
+            aria-controls="command-examples"
+            onClick={() => setExamplesOpen((v) => !(v || (focusWithin && !text)))}
+          >
+            {showExamples ? 'Hide examples' : 'Show examples'}
+          </button>
+        </div>
       </form>
-      <div className="examples" aria-label="Example commands" role="group">
-        <span className="examples-label" aria-hidden="true">Try:</span>
+      <div className="examples" id="command-examples" aria-label="Example commands" role="group" hidden={!showExamples}>
         {EXAMPLES.map((ex) => (
-          <button key={ex} type="button" className="chip" onClick={() => { setText(ex); input.current?.focus(); }}>
+          <button
+            key={ex}
+            type="button"
+            className="chip"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { setText(ex); setExamplesOpen(false); input.current?.focus(); }}
+          >
             {ex}
           </button>
         ))}

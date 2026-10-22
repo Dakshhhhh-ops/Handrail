@@ -7,7 +7,7 @@ const column = (page: Page, name: string) => page.getByTestId(`column-${name}`);
 const cardIn = (page: Page, col: string, title: string) => column(page, col).locator('[data-card]', { hasText: title });
 
 async function simulate(page: Page) {
-  await page.getByRole('button', { name: 'Boards & files' }).click();
+  await page.locator('#board-switcher').click();
   await page.getByRole('button', { name: 'Simulate teammates’ changes' }).click();
   await expect(page.getByTestId('change-list')).toBeVisible();
 }
@@ -158,7 +158,7 @@ test.describe('handoff between teammates', () => {
   });
 
   test('the built-in demo simulates teammates’ overnight changes', async ({ page }) => {
-    await page.getByRole('button', { name: 'Boards & files' }).click();
+    await page.locator('#board-switcher').click();
     await page.getByRole('button', { name: 'Simulate teammates’ changes' }).click();
     await expect(page.getByTestId('changes')).toContainText('4 changes, 1 for you');
   });
@@ -212,6 +212,34 @@ test.describe('activity panel', () => {
     await expect(column(page, 'To do').locator('[data-card]')).toHaveCount(3);
   });
 
+  test('examples show only while the command box is focused and empty, or on request', async ({ page }) => {
+    const chips = page.getByRole('group', { name: 'Example commands' });
+    await expect(chips).toBeHidden();
+    await page.locator('#command-input').focus();
+    await expect(chips).toBeVisible();
+    await page.locator('#command-input').fill('m');
+    await expect(chips).toBeHidden();
+    await page.locator('#command-input').fill('');
+    await chips.getByRole('button', { name: 'my tasks' }).click();
+    await expect(page.locator('#command-input')).toHaveValue('my tasks');
+    await expect(page.locator('#command-input')).toBeFocused();
+    await page.locator('.board-counts').click();
+    await page.getByRole('button', { name: 'Show examples' }).click();
+    await expect(chips).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Hide examples' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  test('the board name opens the board switcher, where the board can be renamed', async ({ page }) => {
+    await page.locator('#board-switcher').click();
+    const dialog = page.getByRole('dialog', { name: 'Boards & files' });
+    await expect(dialog.getByLabel('Name of this board')).toBeFocused();
+    await dialog.getByLabel('Name of this board').fill('Climate talk v2');
+    await dialog.getByRole('button', { name: 'Rename' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk v2/);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#board-switcher')).toBeFocused();
+  });
+
   test('every command and reply is kept in the history', async ({ page }) => {
     await run(page, 'my tasks');
     await run(page, 'move pizza to done');
@@ -252,16 +280,16 @@ test.describe('automated accessibility audit (axe, WCAG 2.2 AA)', () => {
         localStorage.setItem('handrail:v1', JSON.stringify(raw));
       }, theme);
       await page.reload();
-      await page.getByRole('button', { name: 'Boards & files' }).click();
+      await page.locator('#board-switcher').click();
       await page.getByRole('button', { name: 'Simulate teammates’ changes' }).click();
       await expect(page.getByTestId('changes')).toBeVisible();
       await audit(page);
     });
   }
 
-  for (const name of ['Help', 'Settings', 'Share', 'Boards & files']) {
-    test(`${name} dialog`, async ({ page }) => {
-      await page.getByRole('button', { name, exact: true }).click();
+  for (const [label, name] of [['Help', 'Help'], ['Settings', 'Settings'], ['Share', 'Share'], ['Boards', '']] as const) {
+    test(`${label} dialog`, async ({ page }) => {
+      await (name ? page.getByRole('button', { name, exact: true }) : page.locator('#board-switcher')).click();
       await expect(page.getByRole('dialog')).toBeVisible();
       await audit(page);
     });
