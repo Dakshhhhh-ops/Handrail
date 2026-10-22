@@ -27,7 +27,11 @@ export function Modal({
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
-    if (open && !d.open) d.showModal();
+    if (open && !d.open) {
+      d.showModal();
+      // showModal focuses the first control (the Close button); move to the field that matters.
+      d.querySelector<HTMLElement>('[data-autofocus]')?.focus();
+    }
     if (!open && d.open) d.close();
   }, [open]);
 

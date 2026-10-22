@@ -339,7 +339,7 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
   transform: rotate(-1deg) scale(1.02);
   box-shadow: 0 8px 20px rgb(0 0 0 / 0.18);
 }
-.card.is-grabbed::after { content: 'Picked up · arrows move · Enter drops · Esc cancels'; font-size: 0.8rem; color: var(--accent); font-weight: 700; }
+.grab-hint { font-size: 0.8rem; color: var(--accent); font-weight: 700; order: 3; }
 .card.is-dragging { opacity: 0.45; }
 .card.drop-before { box-shadow: 0 -5px 0 var(--accent); }
 .card.is-highlight { background: var(--highlight); border-color: var(--focus); }

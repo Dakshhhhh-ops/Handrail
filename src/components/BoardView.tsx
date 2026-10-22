@@ -26,14 +26,25 @@ function initials(name: string) {
   return name.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function CardFace({ card, today, me }: { card: Card; today: Date; me: string | null }) {
+/**
+ * The card's accessible name is built from its own content: the visible title,
+ * then hidden text with the full spoken details. The short visual badges are
+ * hidden from screen readers so nothing is read twice.
+ */
+function CardFace({ board, card, today, me, grabbed }: { board: Board; card: Card; today: Date; me: string | null; grabbed: boolean }) {
   const due = card.due ? describeDue(card.due, today) : null;
   const isMe = sameName(card.assignee, me);
+  const spoken = cardLabel(board, card.id, today, me).slice(card.title.length);
   return (
     <>
-      <span className="card-title">{card.title}</span>
+      <span className="card-title">
+        {grabbed && <span className="sr-only">Picked up: </span>}
+        {card.title}
+        <span className="sr-only">{spoken}</span>
+      </span>
+      {grabbed && <span className="grab-hint" aria-hidden="true">Picked up · arrows move · Enter drops · Esc cancels</span>}
       {(due || card.assignee || card.notes.trim()) && (
-        <span className="card-meta">
+        <span className="card-meta" aria-hidden="true">
           {due && (
             <span className={`badge due-${due.status}`}>
               {due.status === 'overdue' && <span aria-hidden="true">⚠ </span>}
@@ -381,7 +392,6 @@ export function BoardView({
                       data-card={id}
                       className={cls}
                       tabIndex={id === tabStop ? 0 : -1}
-                      aria-label={`${grabbed ? 'Picked up: ' : ''}${cardLabel(board, id, today, me)}`}
                       aria-describedby="card-hint"
                       onFocus={() => setFocusedCardId(id)}
                       onClick={() => (grabbed ? drop() : cb.openActions(id))}
@@ -393,7 +403,7 @@ export function BoardView({
                         setDropTarget(null);
                       }}
                     >
-                      <CardFace card={card} today={today} me={me} />
+                      <CardFace board={board} card={card} today={today} me={me} grabbed={grabbed} />
                     </button>
                   </li>
                 );

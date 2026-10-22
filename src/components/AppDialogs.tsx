@@ -43,7 +43,7 @@ export function SettingsDialog({ open, onClose, settings, onChange }: {
             onBlur={() => onChange({ name: name.trim() })}
             onKeyDown={(e) => { if (e.key === 'Enter') onChange({ name: name.trim() }); }}
             aria-describedby="set-name-hint"
-            autoFocus
+            data-autofocus
           />
           <p id="set-name-hint" className="hint">Used to find “my tasks” and to tell teammates who changed what. Use the same name your group uses.</p>
         </div>
@@ -197,7 +197,7 @@ export function ShareDialog({ open, onClose, board, me, onOpenSettings }: {
           <textarea id="share-url" ref={field} readOnly value={url} rows={3} onFocus={(e) => e.currentTarget.select()} />
         </div>
         <div className="form-actions">
-          <button type="button" className="btn btn-primary" onClick={copy} autoFocus>Copy link</button>
+          <button type="button" className="btn btn-primary" onClick={copy} data-autofocus>Copy link</button>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
         </div>
         <p role="status" className="hint">{status}</p>

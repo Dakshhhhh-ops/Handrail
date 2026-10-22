@@ -43,7 +43,7 @@ export function CardActionsDialog({
                   type="button"
                   className="btn btn-secondary"
                   disabled={c.id === loc.column.id}
-                  autoFocus={i === (loc.columnIndex + 1) % board.columns.length}
+                  data-autofocus={i === (loc.columnIndex + 1) % board.columns.length ? true : undefined}
                   onClick={() => onMove(card.id, c.id, 'bottom')}
                 >
                   <span className="key-hint" aria-hidden="true">{i + 1}</span> {c.title}
@@ -153,7 +153,7 @@ export function CardEditorDialog({
         )}
         <div className="field">
           <label htmlFor="ed-title">Title</label>
-          <input id="ed-title" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus maxLength={200} aria-invalid={error && !title.trim() ? true : undefined} aria-describedby={error ? 'ed-error' : undefined} />
+          <input id="ed-title" value={title} onChange={(e) => setTitle(e.target.value)} required data-autofocus maxLength={200} aria-invalid={error && !title.trim() ? true : undefined} aria-describedby={error ? 'ed-error' : undefined} />
         </div>
         <div className="field">
           <label htmlFor="ed-col">Column</label>
@@ -238,7 +238,7 @@ export function ColumnDialog({
       >
         <div className="field">
           <label htmlFor="col-title">{isNew ? 'Column name' : 'Rename column'}</label>
-          <input id="col-title" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus maxLength={200} required />
+          <input id="col-title" value={title} onChange={(e) => setTitle(e.target.value)} data-autofocus maxLength={200} required />
         </div>
         <div className="form-actions">
           <button type="submit" className="btn btn-primary">{isNew ? 'Add column' : 'Save name'}</button>
