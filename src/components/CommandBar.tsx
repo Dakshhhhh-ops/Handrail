@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { canListen, listenOnce, type Listener } from '../lib/speech';
 import { useAnnounce } from './Announcer';
-import type { HistoryEntry } from './ActivityPanel';
+import { ReplyStatus, type HistoryEntry } from './ActivityPanel';
+import { WarningIcon } from './Icons';
 import type { Preview } from '../model/preview';
 
 const EXAMPLES = [
@@ -127,7 +128,7 @@ export function CommandBar({
         <p id="command-preview" className={`preview${willDo && !willDo.ok ? ' is-fail' : ''}`} data-testid="command-preview" hidden={!willDo}>
           {willDo && (
             <>
-              <span aria-hidden="true">→ </span>
+              {willDo.ok ? <span aria-hidden="true">→ </span> : <span className="status-icon is-fail"><WarningIcon size={16} /> </span>}
               {willDo.text}
             </>
           )}
@@ -162,6 +163,7 @@ export function CommandBar({
       </div>
       {lastReply && (
         <p className={`last-reply${lastReply.ok === false ? ' is-fail' : ''}`} data-testid="last-reply">
+          <ReplyStatus ok={lastReply.ok} />
           {lastReply.text}
         </p>
       )}

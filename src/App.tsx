@@ -32,6 +32,19 @@ export default function App() {
   );
 }
 
+/**
+ * Puts focus back where it was before a dialog opened, one frame later (after the
+ * dialog has closed). Skips it if the user has already moved focus somewhere else.
+ */
+function restoreFocus(el: HTMLElement | null) {
+  window.requestAnimationFrame(() => {
+    const active = document.activeElement;
+    const idle = !active || active === document.body || !!active.closest('dialog:not([open])');
+    if (!idle) return;
+    (el && document.contains(el) ? el : document.getElementById('command-input'))?.focus();
+  });
+}
+
 function useToday(): Date {
   const [day, setDay] = useState(() => new Date().toDateString());
   useEffect(() => {
@@ -201,7 +214,7 @@ function Shell({ store }: { store: Handrail }) {
   function closeDialog() {
     setDialog(null);
     const el = lastFocus.current;
-    window.requestAnimationFrame(() => (el && document.contains(el) ? el : document.getElementById('command-input'))?.focus());
+    restoreFocus(el);
   }
 
   // ---- Commands ----------------------------------------------------------
@@ -348,7 +361,7 @@ function Shell({ store }: { store: Handrail }) {
   function closeActivity() {
     setActivityOpen(false);
     const el = lastFocus.current;
-    window.requestAnimationFrame(() => (el && document.contains(el) ? el : document.getElementById('command-input'))?.focus());
+    restoreFocus(el);
   }
 
   function toggleJustMine() {

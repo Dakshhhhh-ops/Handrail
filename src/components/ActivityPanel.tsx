@@ -1,4 +1,15 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { CheckIcon, WarningIcon } from './Icons';
+
+/** ✓ or ⚠ before a reply, with words for screen readers, so success and failure never rely on colour alone. */
+export function ReplyStatus({ ok }: { ok?: boolean }) {
+  if (ok === undefined) return null;
+  return ok ? (
+    <span className="status-icon is-ok"><CheckIcon size={16} /></span>
+  ) : (
+    <span className="status-icon is-fail"><WarningIcon size={16} /><span className="sr-only">Didn’t work: </span></span>
+  );
+}
 
 export interface HistoryEntry {
   id: number;
@@ -26,11 +37,12 @@ function History({ entries }: { entries: HistoryEntry[] }) {
             <li
               key={e.id}
               ref={i === entries.length - 1 ? end : undefined}
-              className={`msg msg-${e.who}${e.ok === false ? ' msg-fail' : ''}`}
+              className={`msg msg-${e.who}${e.ok === false ? ' msg-fail' : e.who === 'handrail' && e.ok ? ' msg-ok' : ''}`}
               data-testid={e.who === 'handrail' ? 'reply' : undefined}
             >
               <span className="sr-only">{e.who === 'you' ? 'You said: ' : 'Handrail: '}</span>
-              {e.text}
+              {e.who === 'handrail' && <ReplyStatus ok={e.ok} />}
+              <span className="msg-text">{e.text}</span>
             </li>
           ))}
         </ol>

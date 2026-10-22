@@ -134,7 +134,8 @@ test.describe('plain-language commands', () => {
     // The preview is not announced while typing.
     await expect(live(page)).not.toContainText('Move “Find five sources');
     await input.fill('blorp');
-    await expect(preview).toHaveText('→ I don’t understand that yet');
+    await expect(preview).toHaveText(/^\s*I don’t understand that yet$/);
+    await expect(preview.locator('.status-icon.is-fail svg')).toBeVisible();
     await expect(preview).toHaveClass(/is-fail/);
     await input.fill('');
     await expect(preview).toBeHidden();
@@ -279,7 +280,11 @@ test.describe('activity panel', () => {
     await expect(items).toHaveCount(4);
     await expect(items.nth(0)).toHaveText('You said: my tasks');
     await expect(items.nth(1)).toContainText('Handrail: You have 2 open cards');
+    await expect(items.nth(1)).toHaveClass(/msg-ok/);
+    await expect(items.nth(1).locator('.status-icon.is-ok svg')).toBeVisible();
     await expect(items.nth(3)).toHaveClass(/msg-fail/);
+    await expect(items.nth(3).locator('.status-icon.is-fail svg')).toBeVisible();
+    await expect(items.nth(3)).toContainText(/Handrail: Didn’t work: I couldn.t find a card called “pizza”\./);
   });
 });
 

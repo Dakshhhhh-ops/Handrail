@@ -322,6 +322,13 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .msg-you { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 4px; }
 .msg-handrail { align-self: flex-start; background: var(--surface-2); border-bottom-left-radius: 4px; border-left: 4px solid var(--accent); }
 .msg-handrail.msg-fail { background: var(--danger-soft); color: var(--danger); border-left-color: var(--danger); }
+.msg-handrail { display: flex; gap: 0.45rem; align-items: flex-start; }
+.status-icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 1.4rem; height: 1.4rem; border-radius: 50%; margin-top: 0.05rem; }
+.status-icon.is-ok { background: var(--accent); color: var(--accent-ink); }
+.status-icon.is-fail { color: var(--danger); }
+.status-icon .icon { display: block; }
+.preview .status-icon { width: auto; height: auto; margin: 0 0.15rem 0 0; vertical-align: -0.2em; }
+.last-reply .status-icon { margin-right: 0.35rem; vertical-align: -0.3em; display: inline-flex; }
 :root[data-theme='contrast'] .msg { border: 1px solid var(--border); }
 
 /* ---- Phone dock --------------------------------------------------------- */
