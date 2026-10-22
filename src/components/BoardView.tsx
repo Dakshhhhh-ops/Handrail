@@ -42,7 +42,6 @@ function CardFace({ board, card, today, me, grabbed }: { board: Board; card: Car
         {card.title}
         <span className="sr-only">{spoken}</span>
       </span>
-      {grabbed && <span className="grab-hint" aria-hidden="true">Picked up · arrows move · Enter drops · Esc cancels</span>}
       {(due || card.assignee || card.notes.trim()) && (
         <span className="card-meta" aria-hidden="true">
           {due && (
@@ -73,7 +72,9 @@ export function BoardView({
   highlightId,
   cb,
   visible,
+  layout = 'columns',
 }: {
+  layout?: 'columns' | 'stacked';
   /** When set, only cards that pass are shown (the "Just mine" filter). Hidden cards are never lost. */
   visible?: (cardId: string) => boolean;
   board: Board;
@@ -89,6 +90,7 @@ export function BoardView({
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const pendingFocus = useRef<string | null>(null);
+  const [cardFocused, setCardFocused] = useState(false);
 
   const isShown = (id: string) => (visible ? visible(id) : true);
   const shownIn = (colIndex: number) => board.columns[colIndex].cardIds.filter(isShown);
@@ -336,6 +338,8 @@ export function BoardView({
   }
 
   return (
+    <>
+    <div className={`board-wrap layout-${layout}`}>
     <div
       id="board"
       className={`board${grab ? ' is-grabbing' : ''}`}
@@ -413,7 +417,8 @@ export function BoardView({
                       className={cls}
                       tabIndex={id === tabStop ? 0 : -1}
                       aria-describedby="card-hint"
-                      onFocus={() => setFocusedCardId(id)}
+                      onFocus={() => { setFocusedCardId(id); setCardFocused(true); }}
+                      onBlur={() => setCardFocused(false)}
                       onClick={() => (grabbed ? drop() : cb.openActions(id))}
                       onKeyDown={(e) => onCardKey(e, id)}
                       draggable
@@ -441,5 +446,26 @@ export function BoardView({
         </button>
       </div>
     </div>
+    </div>
+    {/* Shortcuts for sighted keyboard users. Screen readers get the same text from #card-hint. */}
+    <div className={`shortcut-strip${grab ? ' is-grabbing' : ''}`} aria-hidden="true" hidden={!cardFocused && !grab} data-testid="shortcut-strip">
+      {grab ? (
+        <>
+          <span><kbd>Arrows</kbd> move</span>
+          <span><kbd>Enter</kbd> drop</span>
+          <span><kbd>Esc</kbd> cancel</span>
+        </>
+      ) : (
+        <>
+          <span><kbd>Enter</kbd> actions</span>
+          <span><kbd>Space</kbd> move</span>
+          <span><kbd>1–9</kbd> send to column</span>
+          <span><kbd>E</kbd> edit</span>
+          <span><kbd>I</kbd> details</span>
+          <span><kbd>?</kbd> help</span>
+        </>
+      )}
+    </div>
+    </>
   );
 }

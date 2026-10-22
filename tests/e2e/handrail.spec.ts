@@ -41,6 +41,20 @@ test.describe('keyboard only', () => {
     await expect(cardIn(page, 'Doing', 'Find five sources')).toBeFocused();
   });
 
+  test('a shortcut strip shows sighted keyboard users what keys do', async ({ page }) => {
+    const strip = page.getByTestId('shortcut-strip');
+    await expect(strip).toBeHidden();
+    await page.locator('[data-card]').first().focus();
+    await expect(strip).toHaveText(/Enter actions.*Space move.*1–9 send to column.*E edit.*I details.*\? help/);
+    await expect(strip).toHaveAttribute('aria-hidden', 'true');
+    await page.keyboard.press('Space');
+    await expect(strip).toHaveText(/Arrows move.*Enter drop.*Esc cancel/);
+    await page.keyboard.press('Escape');
+    await expect(strip).toHaveText(/Enter actions/);
+    await page.locator('#command-input').focus();
+    await expect(strip).toBeHidden();
+  });
+
   test('Escape puts a picked-up card back', async ({ page }) => {
     await page.locator('[data-card]').first().focus();
     await page.keyboard.press('Space');
@@ -124,7 +138,7 @@ test.describe('handoff between teammates', () => {
     await page.keyboard.press('Escape');
 
     // Riya opens it on her own device, sets her name, makes changes and shares back.
-    const riyaCtx = await browser.newContext();
+    const riyaCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const riya = await riyaCtx.newPage();
     await riya.goto(link);
     await expect(riya.getByRole('heading', { level: 1 })).toHaveText('Climate talk: group project');
@@ -133,6 +147,7 @@ test.describe('handoff between teammates', () => {
     await riya.getByRole('button', { name: 'Settings' }).click();
     await riya.getByLabel('Your name').fill('Riya');
     await riya.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(riya.getByTestId('settings')).toBeHidden();
     await run(riya, 'move design slides to done');
     await run(riya, 'assign email to priya');
     await riya.getByRole('button', { name: 'Share' }).click();

@@ -59,6 +59,22 @@ function Shell({ store }: { store: Handrail }) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const historyId = useRef(0);
   const [justMine, setJustMine] = useState(false);
+  const dockRef = useRef<HTMLDivElement>(null);
+
+  // Keep the phone dock's height in a CSS variable so nothing hides behind it.
+  useEffect(() => {
+    const el = dockRef.current;
+    const root = document.documentElement;
+    if (!el) {
+      root.style.removeProperty('--dock-h');
+      return;
+    }
+    const set = () => root.style.setProperty('--dock-h', `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [wide, activityOpen]);
 
   const addHistory = useCallback((who: HistoryEntry['who'], text: string, ok?: boolean) => {
     setHistory((h) => [...h, { id: ++historyId.current, who, text, ok }].slice(-80));
@@ -414,8 +430,8 @@ function Shell({ store }: { store: Handrail }) {
           {justMineButton}
         </div>
 
-        <div className={`board-wrap layout-${settings.layout}`}>
           <BoardView
+            layout={settings.layout}
             board={board}
             today={today}
             me={me}
@@ -425,7 +441,6 @@ function Shell({ store }: { store: Handrail }) {
             cb={cb}
             visible={visible}
           />
-        </div>
       </main>
       {wide && (
         <aside className="activity" id="activity" aria-labelledby="activity-h">
@@ -441,7 +456,7 @@ function Shell({ store }: { store: Handrail }) {
       </footer>
 
       {!wide && !activityOpen && (
-        <div className="dock" id="activity" role="region" aria-label="Commands and activity">
+        <div className="dock" id="activity" role="region" aria-label="Commands and activity" ref={dockRef}>
           <button type="button" className="btn btn-secondary dock-activity" onClick={openActivity} aria-haspopup="dialog">
             Activity{unread > 0 && <span className="pill">{unread}<span className="sr-only"> new</span></span>}
           </button>

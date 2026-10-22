@@ -237,7 +237,7 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .layout { flex: 1; display: block; }
 .layout.is-wide { display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 430px); align-items: start; }
 .layout.is-wide main { max-width: none; min-width: 0; }
-.layout.is-narrow ~ .footer { padding-bottom: 11rem; }
+.layout.is-narrow ~ .footer { padding-bottom: calc(var(--dock-h, 0px) + 1rem); }
 
 .activity {
   position: sticky;
@@ -431,7 +431,25 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
   transform: rotate(-1deg) scale(1.02);
   box-shadow: 0 8px 20px rgb(0 0 0 / 0.18);
 }
-.grab-hint { font-size: 0.8rem; color: var(--accent); font-weight: 700; order: 3; }
+.shortcut-strip {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.1rem;
+  margin-top: 0.75rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 12px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.92rem;
+  box-shadow: 0 -4px 16px rgb(0 0 0 / 0.12);
+}
+.shortcut-strip kbd { background: transparent; color: inherit; border-color: currentColor; margin-right: 0.25rem; }
+.shortcut-strip.is-grabbing { background: var(--accent); color: var(--accent-ink); }
+:root[data-theme='contrast'] .shortcut-strip { background: #000; color: #fff; border: 2px solid #fff; }
+.is-narrow .shortcut-strip { bottom: calc(var(--dock-h, 0px) + 0.5rem); }
 .card.is-dragging { opacity: 0.45; }
 .card.drop-before { box-shadow: 0 -5px 0 var(--accent); }
 .card.is-highlight { background: var(--highlight); border-color: var(--focus); }
