@@ -193,7 +193,7 @@ test.describe('handoff between teammates', () => {
   test('the built-in demo simulates teammates’ overnight changes', async ({ page }) => {
     await page.locator('#board-switcher').click();
     await page.getByRole('button', { name: 'Simulate teammates’ changes' }).click();
-    await expect(page.getByTestId('changes')).toContainText('4 changes, 1 for you');
+    await expect(page.getByTestId('changes').locator('.news-count')).toHaveText(/^4\s*changes · 1 for you$/);
   });
 
   test('a broken link is explained', async ({ page }) => {
@@ -221,6 +221,26 @@ test.describe('activity panel', () => {
     await simulate(page);
     await expect(page.getByTestId('change-list').getByRole('listitem')).toHaveCount(4);
     await expect(changes.getByRole('button', { name: 'Got it' })).toBeVisible();
+  });
+
+  test('cards teammates changed are marked on the board until you press Got it', async ({ page }) => {
+    await simulate(page);
+    const email = cardIn(page, 'To do', 'Email Dr. Mehta');
+    await expect(email).toHaveClass(/has-change/);
+    await expect(email.locator('.change-flag')).toHaveText('Riya · reassigned');
+    await expect(email).toHaveAccessibleName(/Changed since you last looked: Riya · reassigned\.$/);
+    await expect(cardIn(page, 'Doing', 'Write the presentation script').locator('.change-flag')).toHaveText('Arjun · moved');
+    await expect(cardIn(page, 'To do', 'Rehearse together').locator('.change-flag')).toHaveText('Riya · new');
+    await expect(cardIn(page, 'Doing', 'Draft the outline')).not.toHaveClass(/has-change/);
+    await page.getByRole('button', { name: 'Got it' }).click();
+    await expect(page.locator('.change-flag')).toHaveCount(0);
+  });
+
+  test('overdue cards get a coloured edge as well as the warning sign and text', async ({ page }) => {
+    const outline = cardIn(page, 'Doing', 'Draft the outline');
+    await expect(outline).toHaveClass(/is-overdue/);
+    await expect(outline.locator('.due-overdue')).toHaveText(/Overdue 1d/);
+    await expect(outline.locator('.due-overdue svg')).toBeVisible();
   });
 
   test('“Just mine” filters the board and the change list', async ({ page }) => {

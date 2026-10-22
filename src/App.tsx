@@ -18,6 +18,8 @@ import { ChangesPanel } from './components/ChangesPanel';
 import { ActivityContent, type HistoryEntry } from './components/ActivityPanel';
 import { Modal } from './components/Modal';
 import { useMediaQuery } from './lib/useMediaQuery';
+import { CheckIcon, ChevronDownIcon, RedoIcon, UndoIcon } from './components/Icons';
+import type { ChangeKind } from './model/diff';
 import { CardActionsDialog, CardEditorDialog, ColumnDialog, type EditorValue } from './components/CardDialogs';
 import { BoardsDialog, HelpDialog, SettingsDialog, ShareDialog } from './components/AppDialogs';
 
@@ -354,6 +356,20 @@ function Shell({ store }: { store: Handrail }) {
   const firstCard = board.columns.flatMap((c) => c.cardIds).find((id) => !visible || visible(id)) ?? null;
   const unread = store.changesAcknowledged ? 0 : store.changes.length;
 
+  // Cards teammates changed since you last looked, labelled for the board ("Riya · moved").
+  const changedCards: Record<string, string> = {};
+  if (!store.changesAcknowledged) {
+    const verbs: Record<ChangeKind, string> = { added: 'new', moved: 'moved', renamed: 'renamed', due: 'new date', assigned: 'reassigned', notes: 'notes', removed: 'removed', column: '' };
+    const kinds: Record<string, string[]> = {};
+    for (const c of store.changes) {
+      if (!c.cardId || !board.cards[c.cardId] || !verbs[c.kind]) continue;
+      (kinds[c.cardId] ??= []).includes(verbs[c.kind]) || kinds[c.cardId].push(verbs[c.kind]);
+    }
+    for (const [id, list] of Object.entries(kinds)) {
+      changedCards[id] = `${board.cards[id].lastEditedBy ?? 'Someone'} · ${list.join(', ')}`;
+    }
+  }
+
   function openActivity() {
     lastFocus.current = document.activeElement as HTMLElement | null;
     setActivityOpen(true);
@@ -377,7 +393,7 @@ function Shell({ store }: { store: Handrail }) {
 
   const justMineButton = (
     <button type="button" className={`btn btn-secondary small toggle${justMine ? ' is-on' : ''}`} aria-pressed={justMine} onClick={toggleJustMine}>
-      {justMine && <span aria-hidden="true">✓</span>} Just mine
+      {justMine && <CheckIcon size={16} />} Just mine
     </button>
   );
 
@@ -422,10 +438,10 @@ function Shell({ store }: { store: Handrail }) {
         </div>
         <nav aria-label="Board tools" className="toolbar">
           <button type="button" className="btn btn-quiet" onClick={undo} disabled={!store.canUndo} title={store.undoLabel ? `Undo: ${store.undoLabel}` : 'Nothing to undo'}>
-            <span aria-hidden="true">↶</span> Undo
+            <UndoIcon /> Undo
           </button>
           <button type="button" className="btn btn-quiet" onClick={redo} disabled={!store.canRedo} title={store.redoLabel ? `Redo: ${store.redoLabel}` : 'Nothing to redo'}>
-            <span aria-hidden="true">↷</span> Redo
+            <RedoIcon /> Redo
           </button>
           <button type="button" className="btn btn-secondary" onClick={() => openDialog('share')}>Share</button>
           <button type="button" className="btn btn-secondary" onClick={() => openDialog('settings')}>Settings</button>
@@ -439,7 +455,7 @@ function Shell({ store }: { store: Handrail }) {
           <h1>
             <button type="button" id="board-switcher" className="board-name" onClick={() => openDialog('boards')} aria-haspopup="dialog" aria-describedby="board-switcher-hint">
               {board.title}
-              <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+              <ChevronDownIcon size={20} />
             </button>
           </h1>
           <span id="board-switcher-hint" hidden>Switch, rename, import or export boards</span>
@@ -459,6 +475,7 @@ function Shell({ store }: { store: Handrail }) {
             highlightId={highlightId}
             cb={cb}
             visible={visible}
+            changed={changedCards}
           />
       </main>
       {wide && (

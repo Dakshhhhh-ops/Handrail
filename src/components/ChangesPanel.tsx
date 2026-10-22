@@ -50,9 +50,13 @@ export function ChangesPanel({
 
       {open && (
         <>
-          <p className="changes-summary">
-            <strong>{summary(changes)}</strong>
-            {justMine && shown.length < changes.length && <> · showing the {shown.length} for you</>}
+          <p className="news-count">
+            <span className="news-num">{changes.length}</span>{' '}
+            <span>
+              {changes.length === 1 ? 'change' : 'changes'}
+              {changes.some((c) => c.forYou) && <> · <strong>{changes.filter((c) => c.forYou).length} for you</strong></>}
+              {justMine && shown.length < changes.length && <> · showing yours</>}
+            </span>
           </p>
           {shown.length > 0 ? (
             <ul className="change-list" data-testid="change-list">

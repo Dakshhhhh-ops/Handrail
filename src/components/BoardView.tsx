@@ -4,6 +4,7 @@ import { describeDue } from '../model/dates';
 import { cardLabel, positionText, sameName } from '../model/describe';
 import type { Board, Card } from '../model/types';
 import { useAnnounce } from './Announcer';
+import { MoreIcon, PencilIcon, PlusIcon, WarningIcon } from './Icons';
 
 export interface BoardCallbacks {
   apply: (b: Board, label: string) => void;
@@ -31,7 +32,7 @@ function initials(name: string) {
  * then hidden text with the full spoken details. The short visual badges are
  * hidden from screen readers so nothing is read twice.
  */
-function CardFace({ board, card, today, me, grabbed }: { board: Board; card: Card; today: Date; me: string | null; grabbed: boolean }) {
+function CardFace({ board, card, today, me, grabbed, change }: { board: Board; card: Card; today: Date; me: string | null; grabbed: boolean; change?: string }) {
   const due = card.due ? describeDue(card.due, today) : null;
   const isMe = sameName(card.assignee, me);
   const spoken = cardLabel(board, card.id, today, me).slice(card.title.length);
@@ -40,13 +41,18 @@ function CardFace({ board, card, today, me, grabbed }: { board: Board; card: Car
       <span className="card-title">
         {grabbed && <span className="sr-only">Picked up: </span>}
         {card.title}
-        <span className="sr-only">{spoken}</span>
+        <span className="sr-only">{spoken}{change ? ` Changed since you last looked: ${change}.` : ''}</span>
       </span>
+      {change && (
+        <span className="change-flag" aria-hidden="true">
+          {change}
+        </span>
+      )}
       {(due || card.assignee || card.notes.trim()) && (
         <span className="card-meta" aria-hidden="true">
           {due && (
             <span className={`badge due-${due.status}`}>
-              {due.status === 'overdue' && <span aria-hidden="true">⚠ </span>}
+              {due.status === 'overdue' && <WarningIcon size={14} />}
               {due.short}
             </span>
           )}
@@ -56,7 +62,11 @@ function CardFace({ board, card, today, me, grabbed }: { board: Board; card: Car
               {isMe ? 'You' : card.assignee}
             </span>
           )}
-          {card.notes.trim() && <span className="has-notes">Notes</span>}
+          {card.notes.trim() && (
+            <span className="has-notes">
+              <PencilIcon size={14} /> Notes
+            </span>
+          )}
         </span>
       )}
     </>
@@ -73,7 +83,10 @@ export function BoardView({
   cb,
   visible,
   layout = 'columns',
+  changed,
 }: {
+  /** Cards teammates changed since you last looked, with a short label like "Riya · moved". */
+  changed?: Record<string, string>;
   layout?: 'columns' | 'stacked';
   /** When set, only cards that pass are shown (the "Just mine" filter). Hidden cards are never lost. */
   visible?: (cardId: string) => boolean;
@@ -358,7 +371,7 @@ export function BoardView({
           <section key={col.id} className="column" aria-labelledby={headingId} data-testid={`column-${col.title}`}>
             <div className="column-head">
               <h2 id={headingId}>
-                <span className="col-num" aria-hidden="true">{ci + 1}</span>
+                <span className="col-num" aria-hidden="true">{String(ci + 1).padStart(2, '0')}</span>
                 {col.title}
                 <span className="count">
                   <span className="sr-only">, </span>
@@ -367,7 +380,7 @@ export function BoardView({
                 </span>
               </h2>
               <button type="button" className="btn btn-quiet icon-only" onClick={() => cb.openColumn(col.id)} aria-label={`Options for column ${col.title}`}>
-                <span aria-hidden="true">⋯</span>
+                <MoreIcon size={20} />
               </button>
             </div>
             <ol
@@ -397,6 +410,8 @@ export function BoardView({
                   dragId === id && 'is-dragging',
                   highlightId === id && 'is-highlight',
                   dropTarget === `${col.id}:${i}` && 'drop-before',
+                  card.due && describeDue(card.due, today).status === 'overdue' && 'is-overdue',
+                  changed?.[id] && 'has-change',
                 ].filter(Boolean).join(' ');
                 return (
                   <li
@@ -428,21 +443,21 @@ export function BoardView({
                         setDropTarget(null);
                       }}
                     >
-                      <CardFace board={board} card={card} today={today} me={me} grabbed={grabbed} />
+                      <CardFace board={board} card={card} today={today} me={me} grabbed={grabbed} change={changed?.[id]} />
                     </button>
                   </li>
                 );
               })}
             </ol>
             <button type="button" className="btn btn-ghost add-card" onClick={() => cb.openEditor(null, col.id)}>
-              <span aria-hidden="true">+</span> Add card<span className="sr-only"> to {col.title}</span>
+              <PlusIcon size={16} /> Add card<span className="sr-only"> to {col.title}</span>
             </button>
           </section>
         );
       })}
       <div className="column column-add">
         <button type="button" className="btn btn-ghost" onClick={cb.addColumn}>
-          <span aria-hidden="true">+</span> Add column
+          <PlusIcon size={16} /> Add column
         </button>
       </div>
     </div>

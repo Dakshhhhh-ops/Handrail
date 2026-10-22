@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { CloseIcon } from './Icons';
 
 /**
  * A native <dialog>: the browser traps focus, Escape closes it, and screen
@@ -58,7 +59,7 @@ export function Modal({
           <div className="modal-head">
             <h2 id={`${id}-t`}>{title}</h2>
             <button type="button" className="btn btn-quiet icon-only" onClick={onClose} aria-label="Close">
-              <span aria-hidden="true">✕</span>
+              <CloseIcon size={20} />
             </button>
           </div>
           {description && (
