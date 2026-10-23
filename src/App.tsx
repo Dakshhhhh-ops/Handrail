@@ -38,15 +38,21 @@ import { BoardsDialog, HelpDialog, SettingsDialog, ShareDialog } from './compone
 type DialogName = 'settings' | 'help' | 'share' | 'boards' | null;
 
 const STORY_SEEN = 'handrail:story-seen';
+/** Set for the rest of the browser session once someone opens the board from the story. */
+const STORY_SHOWN = 'handrail:story-shown';
 
 /**
- * Everyone lands on the board. The story only opens when asked for (?story, or the
- * "New here?" line), so nobody has to get through a scroll page to reach the work.
+ * The scroll story is the front page, once per browser session: a new visit starts with
+ * it, and reloading while you work goes straight to the board. Share links and the
+ * eyes-closed challenge always skip it; ?story always shows it.
  */
 function showStoryFirst(): boolean {
   try {
     if (window.location.hash.startsWith('#board=')) return false;
-    return new URLSearchParams(window.location.search).has('story');
+    const q = new URLSearchParams(window.location.search);
+    if (q.has('story')) return true;
+    if (q.has('blindfold') || q.has('board')) return false;
+    return !sessionStorage.getItem(STORY_SHOWN);
   } catch {
     return false;
   }
@@ -68,10 +74,19 @@ export default function App() {
   const enter = useCallback(() => {
     try {
       localStorage.setItem(STORY_SEEN, '1');
+      sessionStorage.setItem(STORY_SHOWN, '1');
+      const q = new URLSearchParams(window.location.search);
+      if (q.has('story')) {
+        q.delete('story');
+        const rest = q.toString();
+        window.history.replaceState(null, '', `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash}`);
+      }
     } catch {
       /* ignore */
     }
     window.scrollTo(0, 0);
+    // They've had the introduction; the "New here" line would repeat it.
+    setNewHere(false);
     setArrived(true);
     setStory(false);
   }, []);
@@ -280,7 +295,11 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
       // Focus moves to the short heading first; the summary follows, so a screen reader
       // reads the summary instead of every item in the panel, and focus speech can't cut it off.
       const said = `Opened the shared “${title}”. ${n} ${n === 1 ? 'change' : 'changes'} since you last looked${forYou ? `, ${forYou} for you` : ''}. ${summarize(store.changes, me, today)}`;
-      window.setTimeout(() => announce(said), 400);
+      const pending = window.setTimeout(() => announce(said), 400);
+      // If they act straight away, their action's announcement wins over the summary.
+      const cancel = () => window.clearTimeout(pending);
+      window.addEventListener('pointerdown', cancel, { once: true, capture: true });
+      window.addEventListener('keydown', cancel, { once: true, capture: true });
       if (wide) {
         focusLater('changes-h');
         window.setTimeout(() => replayChanges(store.changes), 700);

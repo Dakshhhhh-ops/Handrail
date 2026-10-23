@@ -19,7 +19,10 @@ async function run(page: Page, text: string) {
 
 test.beforeEach(async ({ page }) => {
   // The story is shown to first-time visitors; these tests are about the board.
-  await page.addInitScript(() => localStorage.setItem('handrail:story-seen', '1'));
+  await page.addInitScript(() => {
+    localStorage.setItem('handrail:story-seen', '1');
+    sessionStorage.setItem('handrail:story-shown', '1');
+  });
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Climate talk: group project');
 });
@@ -619,14 +622,10 @@ test.describe('automated accessibility audit (axe, WCAG 2.2 AA)', () => {
 });
 
 test.describe('the story (first visit)', () => {
-  test('first-time visitors land on the board, with the story and challenge one click away', async ({ browser }) => {
+  test('a new visit opens on the story; “Open the board” is the first thing to Tab to', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const page = await ctx.newPage();
     await page.goto('/');
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
-    const welcome = page.getByRole('complementary', { name: 'New here' });
-    await expect(welcome).toBeVisible();
-    await welcome.getByRole('button', { name: '1-minute story' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Never hunt for what changed\./);
     await page.keyboard.press('Tab');
     await expect(page.getByRole('button', { name: 'Open the board' }).first()).toBeFocused();
@@ -634,17 +633,22 @@ test.describe('the story (first visit)', () => {
     await expect(page.locator('#board-switcher')).toBeFocused();
     await expect(page.getByTestId('live-region')).toContainText('Board opened');
     await expect(page.getByRole('complementary', { name: 'New here' })).toHaveCount(0);
-    // Returning visitors go straight to the board, without the welcome line.
+    // Reloading while you work goes straight to the board.
     await page.reload();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
     await expect(page.getByRole('complementary', { name: 'New here' })).toHaveCount(0);
+    // ?story always shows it, and leaving it tidies the address.
+    await page.goto('/?story');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Never hunt for what changed\./);
+    await page.getByRole('button', { name: 'Open the board' }).first().click();
+    await expect(page).not.toHaveURL(/story/);
     await ctx.close();
   });
 
-  test('“See what changed” on the welcome line runs the teammate demo', async ({ browser }) => {
+  test('?board skips the story; the welcome line’s “See what changed” runs the teammate demo', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const page = await ctx.newPage();
-    await page.goto('/');
+    await page.goto('/?board');
     await page.getByRole('button', { name: 'See what changed' }).click();
     await expect(page.getByTestId('changes')).toContainText('4');
     await ctx.close();
@@ -653,7 +657,7 @@ test.describe('the story (first visit)', () => {
   test('share links never show the story', async ({ browser }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
-    await page.goto('/');
+    await page.goto('/?board');
     await page.getByRole('button', { name: 'Share' }).click();
     const link = await page.getByLabel(/Link to/).inputValue();
     const fresh = await (await browser.newContext()).newPage();

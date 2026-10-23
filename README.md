@@ -2,7 +2,7 @@
 
 **A project board that tells you what changed, so you never have to hunt for it, with or without sight.**
 
-**Try it:** https://dakshhhhh-ops.github.io/Handrail/. It needs no account and opens straight on a sample group project. A 1-minute scroll story is at [?story](https://dakshhhhh-ops.github.io/Handrail/?story).
+**Try it:** https://dakshhhhh-ops.github.io/Handrail/. It needs no account. It opens with a 1-minute scroll story (once per visit), then a sample group project. To skip the story, use [?board](https://dakshhhhh-ops.github.io/Handrail/?board).
 
 - **Try it with your eyes closed:** https://dakshhhhh-ops.github.io/Handrail/?blindfold. The screen goes dark and Handrail talks you through finding what changed and moving a card, by keyboard only. It takes about a minute and is timed.
 - **See the main feature:** click the board name and choose *Simulate teammates' changes*. Then try **Show me on the board** and **Before / now**.
@@ -51,7 +51,7 @@ Trello ids are kept, so a re-import updates the same board instead of making a c
 - **Voice:** a Speak button, in browsers with speech recognition (Chrome, Edge). Card-name matching tolerates recognition slips: "lab raport" still finds "Lab report".
 - **Low vision and dyslexia:** high-contrast theme, text up to 200%, Atkinson Hyperlegible or OpenDyslexic fonts, relaxed spacing, a stacked layout for screen magnifiers, and replies read aloud for people who don't use a screen reader.
 - **Mouse users:** normal drag-and-drop still works, so mixed groups can share one board.
-- **Motion with a purpose:** cards glide when they move (so sighted teammates see what changed), tilt in 3D under the mouse, and an optional 1-minute scroll story shows a 3D board (GSAP, ScrollTrigger, Lenis). The story never opens by itself. All of it turns off with the system's reduced-motion setting or Handrail's own "Turn off animations", and the story has a Pause button.
+- **Motion with a purpose:** cards glide when they move (so sighted teammates see what changed), tilt in 3D under the mouse, and the front page is a 1-minute scroll story with a 3D board (GSAP, ScrollTrigger, Lenis). It shows once per visit, and "Open the board" is the first thing you reach by Tab. All of it turns off with the system's reduced-motion setting or Handrail's own "Turn off animations", and the story has a Pause button.
 - **Works offline and installs like an app:** a service worker keeps a copy, so once opened Handrail works without a connection.
 - **Groups already on Trello:** import a Trello JSON export, then re-import newer exports to hear what changed in Trello (see above). CSV import too. Export as a backup, CSV or plain text.
 
