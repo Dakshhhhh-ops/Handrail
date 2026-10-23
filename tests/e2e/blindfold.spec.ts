@@ -14,6 +14,8 @@ async function startChallenge(page: Page) {
   await expect(intro).toBeVisible();
   await intro.getByRole('button', { name: 'Start, and turn the screen off' }).click();
   await expect(page.getByTestId('blindfold-layer')).toBeVisible();
+  // Starting runs the teammate demo, which moves focus to the change list a frame later.
+  await expect(page.locator('#changes-h')).toBeFocused();
 }
 
 async function tabTo(page: Page, text: RegExp, max = 40) {
