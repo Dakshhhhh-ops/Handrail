@@ -4,6 +4,7 @@ import { describeConflicts, diffBoards, type Change } from '../model/diff';
 import { newId } from '../model/board';
 import { demoBoard, demoTeammateEdits } from '../model/seed';
 import { validateBoard } from '../model/validate';
+import { revertEdit } from '../model/revert';
 import { docFromHash } from '../model/share';
 import { covers } from '../lib/live';
 import type { Board } from '../model/types';
@@ -47,8 +48,10 @@ interface Saved {
   settings: Settings;
 }
 
-interface Entry {
-  board: Board;
+/** One undoable action: the board just before and just after it. */
+export interface Entry {
+  before: Board;
+  after: Board;
   label: string;
 }
 
@@ -233,7 +236,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         saved: write(saved, action.board, true),
-        past: [...state.past, { board: current, label: action.label }].slice(-HISTORY),
+        past: [...state.past, { before: current, after: action.board, label: action.label }].slice(-HISTORY),
         future: [],
       };
     case 'replace':
@@ -242,27 +245,30 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         saved: write(saved, current, true),
-        past: [...state.past, { board: action.origin, label: action.label }].slice(-HISTORY),
+        past: [...state.past, { before: action.origin, after: current, label: action.label }].slice(-HISTORY),
         future: [],
       };
     case 'undo': {
       const prev = state.past[state.past.length - 1];
       if (!prev) return state;
-      // Undo is a new edit that writes the old values back, so it syncs like any other change.
+      // Put back only what that action changed, leaving teammates' later edits alone.
+      // It is a new edit, so it syncs like any other change.
+      const { board } = revertEdit(current, prev.before, prev.after, nameOf(saved));
       return {
         ...state,
-        saved: write(saved, prev.board, true),
+        saved: write(saved, board, true),
         past: state.past.slice(0, -1),
-        future: [{ board: current, label: prev.label }, ...state.future],
+        future: [prev, ...state.future],
       };
     }
     case 'redo': {
       const next = state.future[0];
       if (!next) return state;
+      const { board } = revertEdit(current, next.after, next.before, nameOf(saved));
       return {
         ...state,
-        saved: write(saved, next.board, true),
-        past: [...state.past, { board: current, label: next.label }],
+        saved: write(saved, board, true),
+        past: [...state.past, next],
         future: state.future.slice(1),
       };
     }
@@ -272,12 +278,13 @@ function reducer(state: State, action: Action): State {
         saved: { ...saved, seen: { ...saved.seen, [saved.currentId]: current }, acknowledged: { ...saved.acknowledged, [saved.currentId]: true } },
       };
     case 'loadShared': {
+      // A merge is not undoable, but earlier actions still are: they only touch what they changed.
       const sameBoardOpen = action.doc.id === saved.currentId;
       return {
         ...state,
         saved: receive(saved, action.doc).saved,
-        past: sameBoardOpen ? [...state.past, { board: current, label: 'open the shared version' }] : [],
-        future: [],
+        past: sameBoardOpen ? state.past : [],
+        future: sameBoardOpen ? state.future : [],
       };
     }
     case 'mergeLive': {
@@ -347,6 +354,8 @@ export function useHandrail() {
     canRedo: state.future.length > 0,
     undoLabel: state.past[state.past.length - 1]?.label ?? null,
     redoLabel: state.future[0]?.label ?? null,
+    undoEntry: state.past[state.past.length - 1] ?? null,
+    redoEntry: state.future[0] ?? null,
     apply: useCallback((b: Board, label: string) => dispatch({ type: 'apply', board: b, label }), []),
     replace: useCallback((b: Board) => dispatch({ type: 'replace', board: b }), []),
     commitFrom: useCallback((origin: Board, label: string) => dispatch({ type: 'commitFrom', origin, label }), []),

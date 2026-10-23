@@ -106,7 +106,7 @@ export function diffBoards(before: Board, after: Board, me: string | null, today
 /** Plain-language notes for edits that crossed, so nobody's change disappears silently. */
 export function describeConflicts(conflicts: Conflict[], board: Board): Change[] {
   return conflicts.map((c) => {
-    const title = c.cardId ? board.cards[c.cardId]?.title : null;
+    const title = c.cardId ? board.cards[c.cardId]?.title ?? 'a card that was deleted since' : null;
     const other = c.other ?? 'a teammate';
     const otherOwn = c.other ? `${c.other}’s` : 'theirs';
     const what = {
@@ -117,7 +117,7 @@ export function describeConflicts(conflicts: Conflict[], board: Board): Change[]
       place: `moved “${title}”`,
       alive: `changed whether “${title}” exists (one of you deleted it)`,
     }[c.field];
-    const kept = c.kept === 'yours' ? 'kept yours' : `kept ${otherOwn}. Undo brings yours back`;
+    const kept = c.kept === 'yours' ? 'kept yours' : `kept ${otherOwn}. Edit the card if you want yours back`;
     return {
       kind: 'conflict' as const,
       cardId: c.cardId && board.cards[c.cardId] ? c.cardId : undefined,

@@ -6,6 +6,7 @@ import { parseCommand } from './model/commands';
 import { cardDetails, positionText, sameName } from './model/describe';
 import { executeCommand } from './model/execute';
 import { previewCommand } from './model/preview';
+import { revertEdit } from './model/revert';
 import { summarize } from './model/summary';
 import { findColumn, findPerson } from './model/match';
 import { demoBoard } from './model/seed';
@@ -253,13 +254,23 @@ function Shell({ store }: { store: Handrail }) {
 
   // ---- Undo / redo -----------------------------------------------------------
   const undo = useCallback((): string => {
-    const msg = store.canUndo ? `Undid: ${store.undoLabel}.` : 'Nothing to undo.';
+    const e = store.undoEntry;
+    let msg = 'Nothing to undo.';
+    if (e) {
+      const { skipped } = revertEdit(store.board, e.before, e.after, store.me);
+      msg = `Undid: ${e.label}.${skipped ? ` A teammate has changed ${skipped === 1 ? 'part of it' : `${skipped} parts of it`} since, so ${skipped === 1 ? 'that was' : 'those were'} left as they are.` : ''}`;
+    }
     announce(msg);
     store.undo();
     return msg;
   }, [store, announce]);
   const redo = useCallback((): string => {
-    const msg = store.canRedo ? `Redid: ${store.redoLabel}.` : 'Nothing to redo.';
+    const e = store.redoEntry;
+    let msg = 'Nothing to redo.';
+    if (e) {
+      const { skipped } = revertEdit(store.board, e.after, e.before, store.me);
+      msg = `Redid: ${e.label}.${skipped ? ` ${skipped === 1 ? 'One part was' : `${skipped} parts were`} changed by a teammate since and left as they are.` : ''}`;
+    }
     announce(msg);
     store.redo();
     return msg;
