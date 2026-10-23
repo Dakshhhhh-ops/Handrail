@@ -106,7 +106,7 @@ To try it without two devices, click the board name, then choose **Simulate team
 npm install
 npm run dev          # http://localhost:5173
 npm test             # 129 unit and property-based tests
-npm run test:e2e     # 58 browser tests, including the axe accessibility audit
+npm run test:e2e     # 59 browser tests, including the axe accessibility audit
 npm run build        # static site in dist/
 ```
 
@@ -140,7 +140,7 @@ flowchart LR
   - Size caps, and a bounded decompressor so a tiny link can't expand into gigabytes.
   - Names reserved by JavaScript objects are rejected.
   - Clocks and version vectors are derived from the writes themselves, and implausible clocks are refused.
-- **Testing:** 129 Vitest tests and 58 Playwright tests.
+- **Testing:** 129 Vitest tests and 59 Playwright tests.
   - Property-based tests (fast-check) generate hundreds of random three-person edit-and-swap histories and check that everyone ends up with the same, well-formed board.
   - Browser tests cover two people merging concurrent edits, keyboard-only use, and a real two-browser live session.
   - **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog, phone width and 200% text, with zero violations.
