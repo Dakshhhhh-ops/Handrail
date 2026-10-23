@@ -101,7 +101,10 @@ export function BoardView({
   layout = 'columns',
   changed,
   readOnly = false,
+  tiltCards = false,
 }: {
+  /** Labs: tilt cards in 3D under the mouse. */
+  tiltCards?: boolean;
   /** Showing an earlier version: you can move around and read, but not change anything. */
   readOnly?: boolean;
   /** Cards teammates changed since you last looked, with a short label like "Riya · moved". */
@@ -509,8 +512,8 @@ export function BoardView({
                       onClick={() => (readOnly ? announce('This is how the board looked before. Choose “Show now” to make changes.') : grabbed ? drop() : cb.openActions(id))}
                       onKeyDown={(e) => { setHintHeard(true); onCardKey(e, id); }}
                       draggable={!readOnly}
-                      onPointerMove={tilt}
-                      onPointerLeave={untilt}
+                      onPointerMove={tiltCards ? tilt : undefined}
+                      onPointerLeave={tiltCards ? untilt : undefined}
                       onDragStart={(e) => onDragStart(e, id)}
                       onDragEnd={() => {
                         setDragId(null);

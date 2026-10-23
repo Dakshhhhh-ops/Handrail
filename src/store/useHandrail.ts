@@ -21,6 +21,10 @@ export interface Settings {
   reduceMotion: boolean;
   /** System notifications for live changes while Handrail is in the background. */
   notify: boolean;
+  /** Labs: extras outside the main idea, off by default. */
+  labsLive: boolean;
+  labsCsv: boolean;
+  labsTilt: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -34,6 +38,9 @@ export const DEFAULT_SETTINGS: Settings = {
   speechRate: 1,
   reduceMotion: false,
   notify: false,
+  labsLive: false,
+  labsCsv: false,
+  labsTilt: false,
 };
 
 export interface Saved {
@@ -221,6 +228,9 @@ function cleanSettings(raw: unknown): Settings {
     speechRate: one(s.speechRate, [0.75, 1, 1.25, 1.5, 2] as const, DEFAULT_SETTINGS.speechRate),
     reduceMotion: typeof s.reduceMotion === 'boolean' ? s.reduceMotion : DEFAULT_SETTINGS.reduceMotion,
     notify: typeof s.notify === 'boolean' ? s.notify : DEFAULT_SETTINGS.notify,
+    labsLive: s.labsLive === true,
+    labsCsv: s.labsCsv === true,
+    labsTilt: s.labsTilt === true,
   };
 }
 

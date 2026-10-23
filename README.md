@@ -33,6 +33,18 @@ Priya's group already lives in Trello, and they won't move for one person. They 
 
 Trello ids are kept, so a re-import updates the same board instead of making a copy. Trello's last export is stored as its own copy of the document, and a re-import is merged like a teammate's link. Only what changed in Trello is applied. Cards Priya added or moved in Handrail in between stay as she left them, unless Trello changed the same card, in which case Trello's newer change wins and she is told.
 
+## One problem, one loop
+
+Handrail does one job: **telling you what your teammates changed, when you can't scan the board.** Everything in the main app serves one loop:
+
+1. **Changes arrive:** a teammate's link, or a newer Trello export.
+2. **Handrail says what changed,** in plain sentences, with what involves you first.
+3. **You act on it without dragging:** keys, a menu, or a typed or spoken sentence. Undo anything.
+
+The supporting pieces exist only because the loop needs them. The CRDT merge lets two copies of a board be compared and combined. Keyboard moves make the board usable at all without a mouse. Trello import means nobody has to switch tools.
+
+**Kept out of the main app on purpose.** Live sessions, CSV import and export, and 3D card tilt are in **Settings → Labs**, off by default. They work, but they aren't the point.
+
 ## What it does
 
 | Instead of… | In Handrail you… |
@@ -51,9 +63,9 @@ Trello ids are kept, so a re-import updates the same board instead of making a c
 - **Voice:** a Speak button, in browsers with speech recognition (Chrome, Edge). Card-name matching tolerates recognition slips: "lab raport" still finds "Lab report".
 - **Low vision and dyslexia:** high-contrast theme, text up to 200%, Atkinson Hyperlegible or OpenDyslexic fonts, relaxed spacing, a stacked layout for screen magnifiers, and replies read aloud for people who don't use a screen reader.
 - **Mouse users:** normal drag-and-drop still works, so mixed groups can share one board.
-- **Motion with a purpose:** cards glide when they move (so sighted teammates see what changed), tilt in 3D under the mouse, and the front page is a 1-minute scroll story with a 3D board (GSAP, ScrollTrigger, Lenis). It shows once per visit, and "Open the board" is the first thing you reach by Tab. All of it turns off with the system's reduced-motion setting or Handrail's own "Turn off animations", and the story has a Pause button.
+- **Motion with a purpose:** cards glide when they move (so sighted teammates see what changed), and the front page is a 1-minute scroll story with a 3D board (GSAP, ScrollTrigger, Lenis). It shows once per visit, and "Open the board" is the first thing you reach by Tab. All of it turns off with the system's reduced-motion setting or Handrail's own "Turn off animations", and the story has a Pause button.
 - **Works offline and installs like an app:** a service worker keeps a copy, so once opened Handrail works without a connection.
-- **Groups already on Trello:** import a Trello JSON export, then re-import newer exports to hear what changed in Trello (see above). CSV import too. Export as a backup, CSV or plain text.
+- **Groups already on Trello:** import a Trello JSON export, then re-import newer exports to hear what changed in Trello (see above). Export as a backup or as plain text (CSV is in Labs).
 
 | Command box | Keyboard pick-up | Action menu instead of dragging |
 |---|---|---|
@@ -71,7 +83,7 @@ Handrail has no backend and no accounts. Every board is a **conflict-free replic
 2. Riya opens it, makes changes, and sends her link back, possibly while Priya kept editing too.
 3. Priya opens Riya's link. Handrail **merges** it into her copy, then writes what changed since she last looked as a short digest ("Riya gave you 'Email Dr. Mehta', moved 'Design slides' to Done…"). Each change is credited to the person who made that exact edit. If they changed the same thing at the same time, it says so and which version it kept.
 
-**Live sessions** do the same thing continuously. Start one from Share and send the invite link: browsers find each other through public Nostr relays and then connect directly over WebRTC. Every edit is merged on arrival and read aloud as it happens.
+**Live sessions** (Settings → Labs, experimental) do the same thing continuously. Once turned on, start one from Share and send the invite link: browsers find each other through public Nostr relays and then connect directly over WebRTC. Every edit is merged on arrival and read aloud as it happens.
 
 To try it without two devices, click the board name, then choose **Simulate teammates' changes**.
 

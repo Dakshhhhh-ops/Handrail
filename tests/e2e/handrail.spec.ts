@@ -60,6 +60,18 @@ test.describe('works on top of Trello', () => {
   });
 });
 
+test('Labs extras stay out of the way until switched on in Settings', async ({ page }) => {
+  await page.locator('#board-switcher').click();
+  const files = page.getByRole('dialog', { name: 'Boards & files' });
+  await expect(files.getByRole('button', { name: 'Download CSV' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByLabel('CSV import and export').check();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.locator('#board-switcher').click();
+  await expect(files.getByRole('button', { name: 'Download CSV' })).toBeVisible();
+});
+
 test.describe('keyboard only', () => {
   test('found with NVDA: Ctrl+Z works from the empty command box, and the card key hint is read once', async ({ page }) => {
     await run(page, 'outline is done');
@@ -464,6 +476,13 @@ test.describe('live session (real network)', () => {
   test.setTimeout(90_000);
 
   test('teammates see and hear each other’s changes as they happen', async ({ page, browser }) => {
+    // Live sessions are a Labs extra, off by default.
+    await page.getByRole('button', { name: 'Share' }).click();
+    await expect(page.getByRole('button', { name: 'Start a live session' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByLabel(/Live sessions \(experimental\)/).check();
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
     await page.getByRole('button', { name: 'Share' }).click();
     await page.getByRole('button', { name: 'Start a live session' }).click();
     const invite = await page.getByLabel('Invite link').inputValue();

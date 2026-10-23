@@ -820,6 +820,7 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
             </div>
           )}
           <BoardView
+            tiltCards={settings.labsTilt}
             readOnly={showBefore && !!before}
             layout={settings.layout}
             board={viewing}
@@ -926,9 +927,10 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
         store={store}
         onSimulate={simulateTeammates}
       />
-      <ShareDialog open={dialog === 'share'} onClose={closeDialog} board={board} doc={store.doc} me={me} liveRoom={live?.room ?? null}
+      <ShareDialog open={dialog === 'share'} onClose={closeDialog} board={board} doc={store.doc} me={me} liveRoom={live?.room ?? null} labsLive={settings.labsLive}
         onStartLive={() => void startLive(newRoomCode())} onLeaveLive={leaveLive} onOpenSettings={() => setDialog('settings')} />
       <BoardsDialog
+        labsCsv={settings.labsCsv}
         open={dialog === 'boards'}
         onClose={closeDialog}
         board={board}

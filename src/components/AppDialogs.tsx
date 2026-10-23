@@ -100,6 +100,22 @@ export function SettingsDialog({ open, onClose, settings, onChange }: {
             Turn off animations
           </label>
         </fieldset>
+        <fieldset className="field" aria-describedby="labs-hint">
+          <legend>Labs</legend>
+          <p id="labs-hint" className="hint">Extras outside Handrail’s main job. Off unless you turn them on.</p>
+          <label className="check">
+            <input type="checkbox" checked={settings.labsLive} onChange={(e) => onChange({ labsLive: e.target.checked })} />
+            Live sessions (experimental): see teammates’ changes as they happen
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={settings.labsCsv} onChange={(e) => onChange({ labsCsv: e.target.checked })} />
+            CSV import and export
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={settings.labsTilt} onChange={(e) => onChange({ labsTilt: e.target.checked })} />
+            Tilt cards in 3D under the mouse
+          </label>
+        </fieldset>
       </div>
       <div className="form-actions">
         <button type="button" className="btn btn-primary" onClick={() => { onChange({ name: name.trim() }); onClose(); }}>Done</button>
@@ -189,9 +205,11 @@ export function HelpDialog({ open, onClose, onChallenge, onStory }: { open: bool
 
 // ---- Share ------------------------------------------------------------------
 
-export function ShareDialog({ open, onClose, board, doc, me, onOpenSettings, liveRoom, onStartLive, onLeaveLive }: {
+export function ShareDialog({ open, onClose, board, doc, me, onOpenSettings, liveRoom, onStartLive, onLeaveLive, labsLive }: {
   open: boolean; onClose: () => void; board: Board; doc: Doc; me: string | null; onOpenSettings: () => void;
   liveRoom: string | null; onStartLive: () => void; onLeaveLive: () => void;
+  /** Live sessions are a Labs extra; an open session always shows. */
+  labsLive: boolean;
 }) {
   const [status, setStatus] = useState('');
   const field = useRef<HTMLTextAreaElement>(null);
@@ -233,7 +251,7 @@ export function ShareDialog({ open, onClose, board, doc, me, onOpenSettings, liv
         </div>
         <p role="status" className="hint">{status}</p>
 
-        <section className="live-share" aria-labelledby="live-share-h">
+        {(liveRoom || labsLive) && <section className="live-share" aria-labelledby="live-share-h">
           <h3 id="live-share-h">Work on it live</h3>
           {liveRoom ? (
             <>
@@ -259,7 +277,7 @@ export function ShareDialog({ open, onClose, board, doc, me, onOpenSettings, liv
               <button type="button" className="btn btn-secondary" onClick={onStartLive}>Start a live session</button>
             </>
           )}
-        </section>
+        </section>}
         <p className="hint">Anyone with the link can read the board. Don’t put passwords or private information on a shared board.</p>
       </div>
     </Modal>
@@ -282,8 +300,10 @@ function download(filename: string, text: string, type: string) {
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'board';
 
 export function BoardsDialog({
-  open, onClose, board, boards, today, onSwitch, onCreate, onDelete, onImported, onTeammateDemo, onResetDemo, onRename,
+  open, onClose, board, boards, today, onSwitch, onCreate, onDelete, onImported, onTeammateDemo, onResetDemo, onRename, labsCsv,
 }: {
+  /** CSV import and export are a Labs extra. */
+  labsCsv: boolean;
   open: boolean;
   onClose: () => void;
   board: Board;
@@ -334,7 +354,7 @@ export function BoardsDialog({
       }
     }
     if (!b) {
-      setStatus('I couldn’t read that file. Use a Trello JSON export, a Handrail backup, or a CSV with a Title column.');
+      setStatus(`I couldn’t read that file. Use a Trello JSON export or a Handrail backup${labsCsv ? ', or a CSV with a Title column' : ''}.`);
       return;
     }
     onImported(b, source, authors);
@@ -385,8 +405,8 @@ export function BoardsDialog({
         <section aria-labelledby="b-import">
           <h3 id="b-import">Import</h3>
           <div className="field">
-            <label htmlFor="import-file">Choose a Trello JSON export, a Handrail backup, or a CSV file</label>
-            <input id="import-file" type="file" accept=".json,.csv,application/json,text/csv" onChange={onFile} />
+            <label htmlFor="import-file">Choose a Trello JSON export or a Handrail backup{labsCsv ? ', or a CSV file' : ''}</label>
+            <input id="import-file" type="file" accept={labsCsv ? '.json,.csv,application/json,text/csv' : '.json,application/json'} onChange={onFile} />
           </div>
           <p className="hint">In Trello: open the board, then Menu → Print, export and share → Export as JSON. Import a newer export of the same board to hear what changed since last time.</p>
           <p role="status" className="hint">{status}</p>
@@ -394,7 +414,7 @@ export function BoardsDialog({
           <h3>Export “{board.title}”</h3>
           <div className="action-list">
             <button type="button" className="btn btn-secondary" onClick={() => download(`${slug(board.title)}.handrail.json`, exportJson(board), 'application/json')}>Download backup</button>
-            <button type="button" className="btn btn-secondary" onClick={() => download(`${slug(board.title)}.csv`, exportCsv(board), 'text/csv')}>Download CSV</button>
+            {labsCsv && <button type="button" className="btn btn-secondary" onClick={() => download(`${slug(board.title)}.csv`, exportCsv(board), 'text/csv')}>Download CSV</button>}
             <button type="button" className="btn btn-secondary" onClick={() => download(`${slug(board.title)}.md`, exportMarkdown(board, today), 'text/markdown')}>Download as text</button>
           </div>
         </section>
