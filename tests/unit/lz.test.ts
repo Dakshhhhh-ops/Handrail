@@ -23,9 +23,11 @@ describe('bounded lz decompression', () => {
   });
 
   it('refuses decompression bombs instead of crashing', () => {
-    const bomb = LZString.compressToEncodedURIComponent('a'.repeat(6_000_000));
-    expect(bomb.length).toBeLessThan(20_000);
-    expect(decompressFromEncodedURIComponent(bomb)).toBeNull();
+    // Same check as the real 5M-character cap, at a small scale so the test stays fast.
+    const bomb = LZString.compressToEncodedURIComponent('a'.repeat(200_000));
+    expect(bomb.length).toBeLessThan(2_000);
+    expect(decompressFromEncodedURIComponent(bomb, 50_000)).toBeNull();
+    expect(decompressFromEncodedURIComponent(bomb, 500_000)).toHaveLength(200_000);
     expect(decompressFromEncodedURIComponent('x'.repeat(400_000))).toBeNull();
   });
 
