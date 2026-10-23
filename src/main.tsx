@@ -5,6 +5,8 @@ import '@fontsource/atkinson-hyperlegible-next/600.css';
 import '@fontsource/atkinson-hyperlegible-next/700.css';
 import '@fontsource/atkinson-hyperlegible-mono/400.css';
 import '@fontsource/atkinson-hyperlegible-mono/700.css';
+import '@fontsource/big-shoulders-display/800';
+import '@fontsource/big-shoulders-display/900';
 import '@fontsource/opendyslexic/400.css';
 import '@fontsource/opendyslexic/700.css';
 import './styles.css';

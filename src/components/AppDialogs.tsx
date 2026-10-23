@@ -49,7 +49,7 @@ export function SettingsDialog({ open, onClose, settings, onChange }: {
           <p id="set-name-hint" className="hint">Used to find “my tasks” and to tell teammates who changed what. Use the same name your group uses.</p>
         </div>
         <Radios legend="Colours" name="theme" value={settings.theme} onChange={(theme) => onChange({ theme })}
-          options={[['system', 'Match my device'], ['light', 'Light'], ['dark', 'Dark'], ['contrast', 'High contrast']]} />
+          options={[['dark', 'Studio (deep indigo)'], ['light', 'Paper (cream)'], ['system', 'Match my device'], ['contrast', 'High contrast']]} />
         <div className="field">
           <label htmlFor="set-size">Text size</label>
           <select id="set-size" value={settings.textSize} onChange={(e) => onChange({ textSize: Number(e.target.value) })}>

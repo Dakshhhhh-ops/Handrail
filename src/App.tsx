@@ -544,6 +544,10 @@ function Shell({ store }: { store: Handrail }) {
             <svg viewBox="0 0 32 32" width="28" height="28"><rect x="3" y="5" width="7" height="22" rx="2" /><rect x="12.5" y="5" width="7" height="14" rx="2" /><rect x="22" y="5" width="7" height="18" rx="2" /><path d="M2 28.5h28" strokeWidth="2.4" strokeLinecap="round" /></svg>
           </span>
           <span className="brand-name">Handrail</span>
+          <span className={`status-pill${live ? ' is-live' : ''}`}>
+            <span className="dot" aria-hidden="true" />
+            {live ? (live.peers.length ? `Live with ${live.peers.length} ${live.peers.length === 1 ? 'teammate' : 'teammates'}` : 'Live session open') : 'Saved on this device'}
+          </span>
         </div>
         <nav aria-label="Board tools" className="toolbar">
           <button type="button" className="btn btn-quiet" onClick={undo} disabled={!store.canUndo} title={store.undoLabel ? `Undo: ${store.undoLabel}` : 'Nothing to undo'}>

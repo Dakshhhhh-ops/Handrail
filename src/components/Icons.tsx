@@ -117,3 +117,10 @@ export const HelpIcon = (p: P) => (
     <path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.5-2.7 4M12 17.5h.01" />
   </Icon>
 );
+
+/** A Figma-style multiplayer cursor, for "someone changed this". */
+export const CursorIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M5 3.5 19 11l-6.2 1.7L9.5 19z" fill="currentColor" />
+  </Icon>
+);

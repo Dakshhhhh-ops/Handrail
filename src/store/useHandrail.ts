@@ -23,7 +23,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   name: '',
-  theme: 'system',
+  theme: 'dark',
   textSize: 100,
   font: 'atkinson',
   spacing: 'normal',

@@ -4,7 +4,15 @@ import { describeDue } from '../model/dates';
 import { cardLabel, positionText, sameName } from '../model/describe';
 import type { Board, Card } from '../model/types';
 import { useAnnounce } from './Announcer';
-import { MoreIcon, PencilIcon, PlusIcon, WarningIcon } from './Icons';
+import { CursorIcon, MoreIcon, PencilIcon, PlusIcon, WarningIcon } from './Icons';
+
+/** Each person gets one of five colours, the same on every device. */
+export function personClass(name: string | null | undefined): string {
+  if (!name) return '';
+  let h = 0;
+  for (const ch of name.trim().toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `p${h % 5}`;
+}
 
 export interface BoardCallbacks {
   apply: (b: Board, label: string) => void;
@@ -49,10 +57,12 @@ function CardFace({ board, card, today, me, grabbed, change }: { board: Board; c
         <span className="sr-only">{spoken}{change ? ` Changed since you last looked: ${change}.` : ''}</span>
       </span>
       {change && (
-        <span className="change-flag" aria-hidden="true">
+        <span className={`change-flag ${personClass(change.split(' · ')[0])}`} aria-hidden="true">
+          <CursorIcon size={12} />
           {change}
         </span>
       )}
+      <span className="focus-tag" aria-hidden="true">You</span>
       {(due || card.assignee || card.notes.trim()) && (
         <span className="card-meta" aria-hidden="true">
           {due && (
@@ -63,7 +73,7 @@ function CardFace({ board, card, today, me, grabbed, change }: { board: Board; c
           )}
           {card.assignee && (
             <span className={`who${isMe ? ' who-me' : ''}`}>
-              <span className="avatar" aria-hidden="true">{initials(card.assignee)}</span>
+              <span className={`avatar ${personClass(card.assignee)}`} aria-hidden="true">{initials(card.assignee)}</span>
               {isMe ? 'You' : card.assignee}
             </span>
           )}
@@ -417,6 +427,7 @@ export function BoardView({
                   dropTarget === `${col.id}:${i}` && 'drop-before',
                   card.due && describeDue(card.due, today).status === 'overdue' && 'is-overdue',
                   changed?.[id] && 'has-change',
+                  changed?.[id] && personClass(changed[id].split(' · ')[0]),
                 ].filter(Boolean).join(' ');
                 return (
                   <li
