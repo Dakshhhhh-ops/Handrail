@@ -24,6 +24,7 @@ import { entrance, replay } from './lib/motion';
 import { personClass } from './components/BoardView';
 import type { Change } from './model/diff';
 import { Modal } from './components/Modal';
+import { Landing } from './components/Landing';
 import { useMediaQuery } from './lib/useMediaQuery';
 import { CheckIcon, ChevronDownIcon, GearIcon, HelpIcon, RedoIcon, ShareIcon, UndoIcon } from './components/Icons';
 import type { ChangeKind } from './model/diff';
@@ -32,11 +33,34 @@ import { BoardsDialog, HelpDialog, SettingsDialog, ShareDialog } from './compone
 
 type DialogName = 'settings' | 'help' | 'share' | 'boards' | null;
 
+const STORY_SEEN = 'handrail:story-seen';
+
+/** First-time visitors see the story; returning users and anyone opening a share link go straight to the board. */
+function showStoryFirst(): boolean {
+  try {
+    if (window.location.hash.startsWith('#board=')) return false;
+    if (new URLSearchParams(window.location.search).has('story')) return true;
+    return !localStorage.getItem(STORY_SEEN) && !localStorage.getItem('handrail:v1');
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
+  const [story, setStory] = useState(showStoryFirst);
   const store = useHandrail();
+  const enter = useCallback(() => {
+    try {
+      localStorage.setItem(STORY_SEEN, '1');
+    } catch {
+      /* ignore */
+    }
+    window.scrollTo(0, 0);
+    setStory(false);
+  }, []);
   return (
     <AnnouncerProvider speakAloud={store.settings.speak} rate={store.settings.speechRate}>
-      <Shell store={store} />
+      {story ? <Landing onEnter={enter} /> : <Shell store={store} onStory={() => { window.scrollTo(0, 0); setStory(true); }} />}
     </AnnouncerProvider>
   );
 }
@@ -63,7 +87,7 @@ function useToday(): Date {
   return useMemo(() => new Date(day), [day]);
 }
 
-function Shell({ store }: { store: Handrail }) {
+function Shell({ store, onStory }: { store: Handrail; onStory: () => void }) {
   const { announce } = useAnnounce();
   const today = useToday();
   const { board, me, settings } = store;
@@ -562,6 +586,9 @@ function Shell({ store }: { store: Handrail }) {
             <svg viewBox="0 0 32 32" width="28" height="28"><rect x="3" y="5" width="7" height="22" rx="2" /><rect x="12.5" y="5" width="7" height="14" rx="2" /><rect x="22" y="5" width="7" height="18" rx="2" /><path d="M2 28.5h28" strokeWidth="2.4" strokeLinecap="round" /></svg>
           </span>
           <span className="brand-name">Handrail</span>
+          <button type="button" className="btn btn-quiet small story-link" onClick={onStory}>
+            Watch the story
+          </button>
           <span className={`status-pill${live ? ' is-live' : ''}`}>
             <span className="dot" aria-hidden="true" />
             {live ? (live.peers.length ? `Live with ${live.peers.length} ${live.peers.length === 1 ? 'teammate' : 'teammates'}` : 'Live session open') : 'Saved on this device'}

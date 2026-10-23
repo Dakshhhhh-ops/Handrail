@@ -18,6 +18,8 @@ async function run(page: Page, text: string) {
 }
 
 test.beforeEach(async ({ page }) => {
+  // The story is shown to first-time visitors; these tests are about the board.
+  await page.addInitScript(() => localStorage.setItem('handrail:story-seen', '1'));
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Climate talk: group project');
 });
@@ -532,4 +534,88 @@ test.describe('automated accessibility audit (axe, WCAG 2.2 AA)', () => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });
+});
+
+test.describe('the story (first visit)', () => {
+  test('first-time visitors see the story; “Open the board” is the first thing to Tab to', async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Never hunt for what changed\./);
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: 'Open the board' }).first()).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+    // Returning visitors go straight to the board.
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+    // And the story is one click away.
+    await page.getByRole('button', { name: 'Watch the story' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Never hunt/);
+    await ctx.close();
+  });
+
+  test('share links never show the story', async ({ browser }) => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Open the board' }).first().click();
+    await page.getByRole('button', { name: 'Share' }).click();
+    const link = await page.getByLabel(/Link to/).inputValue();
+    const fresh = await (await browser.newContext()).newPage();
+    await fresh.goto(link);
+    await expect(fresh.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+    await ctx.close();
+  });
+
+  test('the ruler jumps between sections and Pause stops the looping animation', async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    await page.goto('/?story');
+    const nav = page.getByRole('navigation', { name: 'Story sections' });
+    await nav.getByRole('button', { name: 'Merge' }).click();
+    await expect(nav.getByRole('button', { name: 'Merge' })).toHaveAttribute('aria-current', 'step', { timeout: 5000 });
+    const pause = page.getByRole('button', { name: 'Pause animation' });
+    await pause.click();
+    await expect(page.getByRole('button', { name: 'Play animation' })).toHaveAttribute('aria-pressed', 'true');
+    // The floating board stops moving.
+    const pose = () => page.locator('.iso-float').evaluate((el) => getComputedStyle(el).transform);
+    const a = await pose();
+    await page.waitForTimeout(700);
+    expect(await pose()).toBe(a);
+    await page.getByRole('button', { name: 'Play animation' }).click();
+    await page.waitForTimeout(700);
+    expect(await pose()).not.toBe(a);
+    await ctx.close();
+  });
+
+  for (const motion of ['no-preference', 'reduce'] as const) {
+    test(`story passes the accessibility audit (motion: ${motion})`, async ({ browser }) => {
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, reducedMotion: motion });
+      const page = await ctx.newPage();
+      await page.goto('/?story');
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      await page.waitForTimeout(motion === 'reduce' ? 200 : 2500);
+      if (motion === 'reduce') {
+        // No running animations at all, and no smooth-scroll library.
+        expect(await page.evaluate(() => document.getAnimations().filter((a) => a.playState === 'running').length)).toBe(0);
+        expect(await page.evaluate(() => document.documentElement.classList.contains('lenis'))).toBe(false);
+      }
+      const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze();
+      expect(r.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+      // Every focusable thing is visible when focused.
+      for (let i = 0; i < 14; i++) {
+        await page.keyboard.press('Tab');
+        const ok = await page.evaluate(() => {
+          const el = document.activeElement as HTMLElement | null;
+          if (!el || el === document.body) return true;
+          const r = el.getBoundingClientRect();
+          const s = getComputedStyle(el);
+          return r.width > 0 && r.bottom > 0 && r.top < innerHeight && s.visibility !== 'hidden' && Number(s.opacity) > 0.5;
+        });
+        expect(ok).toBe(true);
+      }
+      await ctx.close();
+    });
+  }
 });
