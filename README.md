@@ -53,6 +53,7 @@ The supporting pieces exist only because the loop needs them. The CRDT merge let
 | Dragging a card | Type or say **"move find sources to doing"** (Handrail shows what it will do before you press Enter), press a **number key** (3 sends it to column 3), or **pick it up with Space** and move it with the arrow keys |
 | Reading every card to find deadlines | Ask **"what's due this week"**, **"anything overdue"** or **"my tasks"**, or press **Just mine** to see only your cards and the changes that involve you |
 | Fiddly date pickers | Type **"due next friday"**, **"in 3 days"** or **"oct 30"** |
+| Sitting through a long readout | Hear the count and the first sentence; say **"more"** for the rest, or **"repeat"** to hear the last message again |
 | Hoping you didn't break something | **Undo** any change with Ctrl+Z, the Undo button, or by saying "undo" |
 | Spotting what moved by eye | **Before / now** flips the board to how it looked when you last saw it; flip back and every changed card glides to its new place. **Show me on the board** sends each teammate's name-tagged cursor to the cards they changed |
 
@@ -106,7 +107,7 @@ To try it without two devices, click the board name, then choose **Simulate team
 npm install
 npm run dev          # http://localhost:5173
 npm test             # 129 unit and property-based tests
-npm run test:e2e     # 59 browser tests, including the axe accessibility audit
+npm run test:e2e     # 60 browser tests, including the axe accessibility audit
 npm run build        # static site in dist/
 ```
 
@@ -140,7 +141,7 @@ flowchart LR
   - Size caps, and a bounded decompressor so a tiny link can't expand into gigabytes.
   - Names reserved by JavaScript objects are rejected.
   - Clocks and version vectors are derived from the writes themselves, and implausible clocks are refused.
-- **Testing:** 129 Vitest tests and 59 Playwright tests.
+- **Testing:** 129 Vitest tests and 60 Playwright tests.
   - Property-based tests (fast-check) generate hundreds of random three-person edit-and-swap histories and check that everyone ends up with the same, well-formed board.
   - Browser tests cover two people merging concurrent edits, keyboard-only use, and a real two-browser live session.
   - **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog, phone width and 200% text, with zero violations.
