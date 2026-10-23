@@ -58,6 +58,28 @@ test.describe('works on top of Trello', () => {
 });
 
 test.describe('keyboard only', () => {
+  test('found with NVDA: Ctrl+Z works from the empty command box, and the card key hint is read once', async ({ page }) => {
+    await run(page, 'outline is done');
+    await expect(live(page)).toContainText('Moved “Draft the outline” to Done');
+    await expect(page.locator('#command-input')).toBeFocused();
+    await expect(page.locator('#command-input')).toHaveValue('');
+    await page.keyboard.press('Control+z');
+    await expect(live(page)).toContainText('Undid');
+    await expect(column(page, 'Doing')).toContainText('Draft the outline');
+
+    const first = page.locator('[data-card]').first();
+    await first.focus();
+    await expect(first).toHaveAccessibleDescription(/Space to pick up and move/);
+    await page.keyboard.press('ArrowDown');
+    await expect(page.locator('[data-card]').nth(1)).toBeFocused();
+    await expect(page.locator('[data-card]').nth(1)).toHaveAccessibleDescription('');
+    // Also after a move, where the card is a new element that never lost focus.
+    await page.keyboard.press('Space');
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('[data-card]:focus')).toHaveAccessibleDescription('');
+    await page.keyboard.press('Escape');
+  });
+
   test('skip link, pick up a card with Space, move it with arrows, drop with Enter', async ({ page }) => {
     await page.keyboard.press('Tab');
     await expect(page.getByRole('link', { name: 'Skip to the board' })).toBeFocused();

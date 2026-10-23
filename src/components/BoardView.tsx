@@ -119,6 +119,8 @@ export function BoardView({
 }) {
   const { announce } = useAnnounce();
   const [grab, setGrab] = useState<Grab | null>(null);
+  // The key hint is read with the first card you land on, not repeated on every card.
+  const [hintHeard, setHintHeard] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const pendingFocus = useRef<string | null>(null);
@@ -407,7 +409,7 @@ export function BoardView({
       tabIndex={-1}
     >
       <p id="card-hint" className="sr-only">
-        Enter for actions. Space to pick up and move. Number keys send to a column. E to edit, I for details.
+        Enter for actions. Space to pick up and move. Question mark for all keys.
       </p>
       {board.columns.map((col, ci) => {
         const headingId = `col-${col.id}-h`;
@@ -478,11 +480,11 @@ export function BoardView({
                       data-card={id}
                       className={cls}
                       tabIndex={id === tabStop ? 0 : -1}
-                      aria-describedby="card-hint"
+                      aria-describedby={hintHeard ? undefined : 'card-hint'}
                       onFocus={() => { setFocusedCardId(id); setCardFocused(true); }}
-                      onBlur={() => setCardFocused(false)}
+                      onBlur={() => { setCardFocused(false); setHintHeard(true); }}
                       onClick={() => (readOnly ? announce('This is how the board looked before. Choose “Show now” to make changes.') : grabbed ? drop() : cb.openActions(id))}
-                      onKeyDown={(e) => onCardKey(e, id)}
+                      onKeyDown={(e) => { setHintHeard(true); onCardKey(e, id); }}
                       draggable={!readOnly}
                       onPointerMove={tilt}
                       onPointerLeave={untilt}

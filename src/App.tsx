@@ -412,7 +412,9 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      const typing = t.closest('input, textarea, select, [contenteditable="true"]');
+      // An empty command box doesn't need text undo, so Ctrl+Z there undoes the last board change.
+      const emptyCommand = t.id === 'command-input' && !(t as HTMLInputElement).value;
+      const typing = !(emptyCommand && (e.ctrlKey || e.metaKey)) && t.closest('input, textarea, select, [contenteditable="true"]');
       if (document.querySelector('dialog[open]')) return;
       if ((e.ctrlKey || e.metaKey) && !typing) {
         const k = e.key.toLowerCase();

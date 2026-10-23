@@ -29,7 +29,13 @@ export function CommandBar({
   const [focusWithin, setFocusWithin] = useState(false);
   const [examplesOpen, setExamplesOpen] = useState(false);
   const showExamples = examplesOpen || (focusWithin && !text);
-  const willDo = text.trim() && preview ? preview(text) : null;
+  // The preview waits until typing pauses, so a screen reader doesn't read a verdict on every half-typed word.
+  const [paused, setPaused] = useState('');
+  useEffect(() => {
+    const t = window.setTimeout(() => setPaused(text), 450);
+    return () => window.clearTimeout(t);
+  }, [text]);
+  const willDo = text.trim() && preview && paused === text ? preview(text) : null;
   const listener = useRef<Listener | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const { announce } = useAnnounce();
@@ -103,7 +109,7 @@ export function CommandBar({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="e.g. move lab report to done"
-            aria-describedby="command-preview command-hint"
+            aria-describedby="command-preview"
           />
           {voiceOk && (
             <button
