@@ -64,7 +64,7 @@ export function CommandBar({
     }
     setText('');
     setListening(true);
-    announce('Listening.');
+    announce('Listening. Try “what changed”, “my tasks”, or “move” and a card name “to done”.');
     listener.current = listenOnce({
       onText: setText,
       onDone: (finalText) => {

@@ -75,7 +75,12 @@ function phrases(changes: Change[], me: string | null, today: Date): string[] {
 }
 
 export function summarize(changes: Change[], me: string | null, today: Date): string {
-  if (changes.length === 0) return 'Nothing has changed since you last looked.';
+  return summarySentences(changes, me, today).join(' ');
+}
+
+/** The summary as separate sentences (one per person, then removals, columns and clashes), so it can be read a piece at a time. */
+export function summarySentences(changes: Change[], me: string | null, today: Date): string[] {
+  if (changes.length === 0) return ['Nothing has changed since you last looked.'];
 
   const people = new Map<string, Change[]>();
   for (const c of changes) {
@@ -99,5 +104,5 @@ export function summarize(changes: Change[], me: string | null, today: Date): st
   if (clashes.length) {
     sentences.push(`${clashes.length === 1 ? 'One edit' : `${clashes.length} edits`} clashed with yours and ${clashes.length === 1 ? 'was' : 'were'} settled automatically; see the list.`);
   }
-  return sentences.join(' ');
+  return sentences;
 }

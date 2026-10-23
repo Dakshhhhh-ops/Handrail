@@ -89,6 +89,19 @@ export function Blindfold({
     }
   }, [open, phase]);
 
+  // Browsers won't play speech until you press something, so someone with their eyes
+  // already closed hears nothing at first. The first key press reads the instructions.
+  useEffect(() => {
+    if (phase !== 'intro' || ownReader) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') return;
+      window.removeEventListener('keydown', onKey, true);
+      utter('Eyes-closed challenge. Press Enter to start. Handrail will then talk you through three small tasks: hear what your teammates changed, go to the card that is now yours, and move a card. Press Escape to leave.', rate, true);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [phase, ownReader, rate]);
+
   // Announcements queue after whatever is being said; focus interrupts, like a screen reader.
   const say = useCallback((text: string) => { if (!appSpeaks && !ownReader) utter(text, rate, false); }, [appSpeaks, ownReader, rate]);
 
@@ -211,6 +224,7 @@ export function Blindfold({
       >
         <div className="bf-intro">
           <p>When you start, the screen goes dark and Handrail talks. Big captions show what it says, for anyone who can’t hear it.</p>
+          <p className="hint">Eyes already closed? Press any letter key to hear these instructions, then Enter to start.</p>
           <ol className="bf-steps">
             {STEPS.map((s) => <li key={s.id}>{s.label}</li>)}
           </ol>

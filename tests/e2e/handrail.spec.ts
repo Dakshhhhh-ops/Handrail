@@ -376,6 +376,23 @@ test.describe('activity panel', () => {
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   });
 
+  test('the arrival summary is short, “more” reads the rest, and “repeat” says it again', async ({ page }) => {
+    await simulate(page);
+    await expect(live(page)).toContainText('4 changes since you last looked, 1 for you. Riya gave you');
+    await expect(live(page)).toContainText('Say or type “more” for the rest.');
+    await expect(live(page)).not.toContainText('Arjun moved');
+    await run(page, 'more');
+    await expect(live(page)).toHaveText('Arjun moved “Write the presentation script” to Doing.');
+    await run(page, 'repeat');
+    await expect(live(page)).toHaveText('Arjun moved “Write the presentation script” to Doing.');
+    // With unread changes, the first thing to Tab to is a link straight to them.
+    await page.reload();
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('link', { name: 'Skip to what changed (4 new)' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'Since you last looked' })).toBeFocused();
+  });
+
   test('unread changes are announced when you come back later', async ({ page }) => {
     await simulate(page);
     await page.reload();

@@ -93,6 +93,10 @@ export function previewCommand(cmd: Command, board: Board, ctx: { today: Date; m
       return { text: 'Read a summary of the board', ok: true };
     case 'changes':
       return { text: 'Read what changed since you last looked', ok: true };
+    case 'more':
+      return { text: 'Read the rest of the summary', ok: true };
+    case 'repeat':
+      return { text: 'Say the last message again', ok: true };
     case 'undo':
       return { text: 'Undo the last change', ok: true };
     case 'redo':

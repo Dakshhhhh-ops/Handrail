@@ -56,6 +56,10 @@ describe('parseCommand', () => {
     expect(parse('please undo')).toEqual({ type: 'undo' });
     expect(parse('what are my tasks')).toEqual({ type: 'unknown', text: 'what are my tasks' });
     expect(parse('my tasks')).toEqual({ type: 'mine' });
+    expect(parse('more')).toEqual({ type: 'more' });
+    expect(parse('tell me more')).toEqual({ type: 'more' });
+    expect(parse('say that again')).toEqual({ type: 'repeat' });
+    expect(parse('repeat')).toEqual({ type: 'repeat' });
   });
 
   it('does not misread edits as deletes, completions or new cards', () => {

@@ -8,7 +8,7 @@ import { daysUntil, describeDue } from './model/dates';
 import { executeCommand } from './model/execute';
 import { previewCommand } from './model/preview';
 import { revertEdit } from './model/revert';
-import { summarize } from './model/summary';
+import { summarize, summarySentences } from './model/summary';
 import { findColumn, findPerson } from './model/match';
 import { demoBoard } from './model/seed';
 import { TRELLO_SOMEONE } from './model/importers';
@@ -130,7 +130,7 @@ function useToday(): Date {
 }
 
 function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory: () => void; arrived: boolean; newHere: boolean }) {
-  const { announce } = useAnnounce();
+  const { announce, message: lastMessage } = useAnnounce();
   const today = useToday();
   const { board, me, settings } = store;
 
@@ -142,6 +142,8 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
   const [dialog, setDialog] = useState<DialogName>(null);
   const [focusTarget, setFocusTarget] = useState<{ id: string; n: number } | null>(null);
   const lastFocus = useRef<HTMLElement | null>(null);
+  /** The rest of a summary that was cut short, for the "more" command. */
+  const moreToSay = useRef('');
   const justOpened = useRef<string | null>(null);
   // Breakpoints follow the chosen text size: at 200% text a 1280px window has the room of a 640px one.
   const scale = store.settings.textSize / 100;
@@ -294,7 +296,10 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
       const forYou = store.changes.filter((c) => c.forYou).length;
       // Focus moves to the short heading first; the summary follows, so a screen reader
       // reads the summary instead of every item in the panel, and focus speech can't cut it off.
-      const said = `Opened the shared “${title}”. ${n} ${n === 1 ? 'change' : 'changes'} since you last looked${forYou ? `, ${forYou} for you` : ''}. ${summarize(store.changes, me, today)}`;
+      // First sentence only, so it's short enough to hear in full; "more" reads the rest.
+      const parts = summarySentences(store.changes, me, today);
+      moreToSay.current = parts.slice(1).join(' ');
+      const said = `Opened the shared “${title}”. ${n} ${n === 1 ? 'change' : 'changes'} since you last looked${forYou ? `, ${forYou} for you` : ''}. ${parts[0]}${parts.length > 1 ? ' Say or type “more” for the rest.' : ''}`;
       const pending = window.setTimeout(() => announce(said), 400);
       // If they act straight away, their action's announcement wins over the summary.
       const cancel = () => window.clearTimeout(pending);
@@ -477,6 +482,10 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
     else if (r.effect === 'redo') reply = redo();
     else if (r.effect === 'help') { openDialog('help'); reply = 'Opened help.'; }
     else if (r.effect === 'changes') reply = store.changes.length === 0 ? 'Nothing has changed since you last looked.' : readChanges();
+    else if (r.effect === 'more') {
+      reply = moreToSay.current || 'That’s everything. Say “what changed” to hear it all again.';
+      moreToSay.current = '';
+    } else if (r.effect === 'repeat') reply = lastMessage || 'Nothing to repeat yet.';
     if (r.board) store.apply(r.board, r.label ?? 'change');
     if (reply && r.effect !== 'undo' && r.effect !== 'redo') announce(reply);
     addHistory('you', text);
@@ -724,6 +733,11 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
 
   return (
     <>
+      {store.changes.length > 0 && !store.changesAcknowledged && (
+        <a className="skip-link" href="#changes" onClick={(e) => { e.preventDefault(); if (wide) focusLater('changes-h'); else openActivity(); }}>
+          Skip to what changed ({store.changes.length} new)
+        </a>
+      )}
       <a className="skip-link" href="#board" onClick={(e) => { e.preventDefault(); focusCardLater(focusedCardId ?? firstCard); }}>
         Skip to the board
       </a>
