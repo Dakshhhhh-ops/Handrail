@@ -25,6 +25,8 @@ export interface Reg<T> {
   v: T;
   /** Lamport clock of the write. */
   c: number;
+  /** Wall-clock time of the write (ms). Breaks ties between concurrent writes: the later one wins. */
+  t: number;
   /** Actor (device) id of the writer; breaks ties between equal clocks. */
   a: string;
   /** Display name of the person who wrote it, for "Riya moved…". */
@@ -70,16 +72,23 @@ export const CARD_FIELDS: CardField[] = ['title', 'notes', 'due', 'assignee'];
 
 // ---- Registers ---------------------------------------------------------------
 
-/** True when write x should win over write y. A total order, so every replica agrees. */
+/**
+ * True when write x should win over write y. The Lamport clock respects cause and
+ * effect (an edit made after seeing another always wins); for concurrent edits the
+ * later real time wins; the actor id settles exact ties. A total order, so every
+ * replica agrees.
+ */
 export function wins(x: Reg<unknown>, y: Reg<unknown>): boolean {
-  return x.c > y.c || (x.c === y.c && x.a > y.a);
+  if (x.c !== y.c) return x.c > y.c;
+  if (x.t !== y.t) return x.t > y.t;
+  return x.a > y.a;
 }
 
 function pick<T>(x: Reg<T>, y: Reg<T>): Reg<T> {
   return wins(y, x) ? y : x;
 }
 
-const NONE = { c: 0, a: '', by: null } as const;
+const NONE = { c: 0, t: 0, a: '', by: null } as const;
 
 export function emptyDoc(id: string): Doc {
   return { kind: 'handrail-doc', v: 2, id, title: { v: '', ...NONE }, cols: {}, cards: {}, clock: 0, vv: {} };
@@ -222,9 +231,9 @@ export function assignKeys(existing: (string | null)[]): string[] {
  * Records the difference between the document and an edited board view as new
  * register writes by `actor`. Returns the same document when nothing changed.
  */
-export function commit(doc: Doc, after: Board, actor: string, by: string | null): Doc {
+export function commit(doc: Doc, after: Board, actor: string, by: string | null, now = Date.now()): Doc {
   const c = doc.clock + 1;
-  const reg = <T,>(v: T): Reg<T> => ({ v, c, a: actor, by });
+  const reg = <T,>(v: T): Reg<T> => ({ v, c, t: now, a: actor, by });
   const next: Doc = { ...doc, cols: { ...doc.cols }, cards: { ...doc.cards } };
   let dirty = false;
 
@@ -307,8 +316,8 @@ export function commit(doc: Doc, after: Board, actor: string, by: string | null)
 }
 
 /** A brand-new document holding `board`, written by `actor`. */
-export function docFromBoard(board: Board, actor: string, by: string | null): Doc {
-  return commit(emptyDoc(board.id), board, actor, by);
+export function docFromBoard(board: Board, actor: string, by: string | null, now = Date.now()): Doc {
+  return commit(emptyDoc(board.id), board, actor, by, now);
 }
 
 // ---- Conflicts ---------------------------------------------------------------
@@ -368,10 +377,13 @@ function vReg<T>(raw: unknown, check: (v: unknown) => v is T): Reg<T> | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   if (typeof r.c !== 'number' || !Number.isInteger(r.c) || r.c < 0 || r.c > 1e12) return null;
+  // Older documents had no wall-clock time; treat it as 0.
+  const t = r.t === undefined ? 0 : r.t;
+  if (typeof t !== 'number' || !Number.isFinite(t) || t < 0 || t > 1e14) return null;
   if (typeof r.a !== 'string' || !ACTOR.test(r.a)) return null;
   if (!(r.by === null || (typeof r.by === 'string' && r.by.length <= 60))) return null;
   if (!check(r.v)) return null;
-  return { v: r.v, c: r.c, a: r.a, by: (r.by as string | null) ?? null };
+  return { v: r.v, c: r.c, t, a: r.a, by: (r.by as string | null) ?? null };
 }
 
 const str = (max: number) => (v: unknown): v is string => typeof v === 'string' && v.length <= max;

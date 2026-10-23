@@ -163,6 +163,15 @@ describe('convergence (property-based)', () => {
     );
   });
 
+  it('ties between concurrent edits go to the later one, then to the actor id', () => {
+    const base = docFromBoard(demoBoard(today), 'seed', null, 1);
+    const early = commit(base, updateCard(materialize(base), 'k-topic', { title: 'Early' }, 'Z'), 'zzz', 'Z', 1000);
+    const late = commit(base, updateCard(materialize(base), 'k-topic', { title: 'Late' }, 'A'), 'aaa', 'A', 2000);
+    expect(materialize(mergeDocs(early, late)).cards['k-topic'].title).toBe('Late');
+    const same = commit(base, updateCard(materialize(base), 'k-topic', { title: 'Same time' }, 'A'), 'aaa', 'A', 1000);
+    expect(materialize(mergeDocs(early, same)).cards['k-topic'].title).toBe('Early');
+  });
+
   it('a later local edit always wins over everything this replica has seen', () => {
     fc.assert(
       fc.property(fc.array(edit, { maxLength: 10 }), fc.array(edit, { maxLength: 10 }), (ea, eb) => {
@@ -184,12 +193,14 @@ describe('convergence (property-based)', () => {
 describe('conflicts', () => {
   it('explains when two people change the same thing without seeing each other', () => {
     const base = docFromBoard(demoBoard(today), 'seed', null);
-    const mine = commit(base, updateCard(materialize(base), 'k-slides', { due: '2026-11-01' }, 'Priya'), 'priya', 'Priya');
-    const theirs = commit(base, updateCard(materialize(base), 'k-slides', { due: '2026-11-05' }, 'Riya'), 'riya', 'Riya');
+    // Riya edits first (t=1000), Priya a moment later (t=2000); neither has seen the other.
+    const theirs = commit(base, updateCard(materialize(base), 'k-slides', { due: '2026-11-05' }, 'Riya'), 'riya', 'Riya', 1000);
+    const mine = commit(base, updateCard(materialize(base), 'k-slides', { due: '2026-11-01' }, 'Priya'), 'priya', 'Priya', 2000);
     const found = findConflicts(mine, theirs, 'priya');
-    // Equal clocks: the tie goes to the higher actor id, the same on every device.
-    expect(found).toEqual([{ cardId: 'k-slides', field: 'due', kept: 'theirs', other: 'Riya' }]);
-    expect(materialize(mergeDocs(mine, theirs)).cards['k-slides'].due).toBe('2026-11-05');
+    // Concurrent edits: the later one (Priya's) wins, on every device.
+    expect(found).toEqual([{ cardId: 'k-slides', field: 'due', kept: 'yours', other: 'Riya' }]);
+    expect(materialize(mergeDocs(mine, theirs)).cards['k-slides'].due).toBe('2026-11-01');
+    expect(materialize(mergeDocs(theirs, mine)).cards['k-slides'].due).toBe('2026-11-01');
     // Once Riya has seen Priya's write, her newer change is not a conflict.
     const riyaLater = commit(mergeDocs(theirs, mine), updateCard(materialize(mergeDocs(theirs, mine)), 'k-slides', { due: '2026-11-09' }, 'Riya'), 'riya', 'Riya');
     expect(findConflicts(mine, riyaLater, 'priya')).toEqual([]);
