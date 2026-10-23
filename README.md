@@ -31,7 +31,7 @@ This isn't hypothetical. Trello has open NVDA bugs with "no known workaround", J
 
 Priya's group already lives in Trello, and they won't move for one person. They don't have to. Priya exports the Trello board as JSON and imports it. Next time she imports the newer export, Handrail compares it with the last one and tells her what changed **in Trello**, credited from Trello's own activity log: *"Riya Sharma moved 'Write method' from To Do to Doing."* Her teammates keep using Trello; Handrail is how Priya reads it.
 
-Trello ids are kept, so a re-import updates the same board instead of making a copy. Trello's last export is stored as its own copy of the document, and a re-import is merged like a teammate's link. Only what changed in Trello is applied, and anything Priya added in Handrail in between is kept.
+Trello ids are kept, so a re-import updates the same board instead of making a copy. Trello's last export is stored as its own copy of the document, and a re-import is merged like a teammate's link. Only what changed in Trello is applied. Cards Priya added or moved in Handrail in between stay as she left them, unless Trello changed the same card, in which case Trello's newer change wins and she is told.
 
 ## What it does
 
@@ -84,7 +84,8 @@ To try it without two devices, click the board name, then choose **Simulate team
 | Space | Pick up. Then arrows move it, Enter drops it, Escape cancels |
 | 1–9 | Send to that column |
 | Alt + arrows | Move one step without picking up |
-| E / I / N / Delete | Edit / read details / new card here / delete |
+| E / I / N | Edit / read details / new card here |
+| Delete, twice | Delete the card (the first press asks; Ctrl+Z brings it back) |
 | `/` · `?` · Ctrl+Z · Ctrl+Y | Command box · help · undo · redo |
 
 ## Run it locally
@@ -92,8 +93,8 @@ To try it without two devices, click the board name, then choose **Simulate team
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm test             # 125 unit and property-based tests
-npm run test:e2e     # 57 browser tests, including the axe accessibility audit
+npm test             # 129 unit and property-based tests
+npm run test:e2e     # 58 browser tests, including the axe accessibility audit
 npm run build        # static site in dist/
 ```
 
@@ -116,7 +117,7 @@ flowchart LR
 - **CRDT document** (`crdt.ts`). Every field is a last-writer-wins register holding the value, a Lamport clock, the wall-clock time, the writing device and the writer's name. Merging keeps the winning write per register, ordered by (clock, time, device, value). That merge is commutative, associative and idempotent, so copies converge whatever order links arrive in.
   - Card order uses **fractional indexing** (copied from rocicorp/fractional-indexing, the approach Figma and Linear describe). A commit keeps the keys of the longest increasing run of cards that didn't move, so a move rewrites one register.
   - `findConflicts` spots fields two people changed without seeing each other's write, so the app can explain what it kept.
-- **Per-action undo** (`revert.ts`). Undo puts back only what your action changed, and only where the board still shows your result, so it never wipes out a teammate's edits that merged in since.
+- **Per-action undo** (`revert.ts`). Undo puts back only what your action changed, and only where the board still shows your result, so a teammate's edits that merged in since are kept. Undoing a delete brings the card back with its newest content, including edits a teammate made after you deleted it, and Escape while carrying a card puts back only that card.
 - **The digest** (`diff.ts`, `summary.ts`). It compares the board you last saw with the merged one, credits each change from the register's author, and folds the changes into short sentences grouped by person, with what involves you first.
 - **Live sync** (`lib/live.ts`). Trystero over Nostr relays, loaded only when a session starts. The protocol is: say hello, send your document when someone joins, and send it again after each of your own edits (debounced). Version vectors stop echoes.
 - **Plain-language commands** (`commands.ts`, `match.ts`, `dates.ts`, `preview.ts`). A deterministic parser with no AI service: offline, instant, private and predictable.
@@ -127,7 +128,7 @@ flowchart LR
   - Size caps, and a bounded decompressor so a tiny link can't expand into gigabytes.
   - Names reserved by JavaScript objects are rejected.
   - Clocks and version vectors are derived from the writes themselves, and implausible clocks are refused.
-- **Testing:** 125 Vitest tests and 57 Playwright tests.
+- **Testing:** 129 Vitest tests and 58 Playwright tests.
   - Property-based tests (fast-check) generate hundreds of random three-person edit-and-swap histories and check that everyone ends up with the same, well-formed board.
   - Browser tests cover two people merging concurrent edits, keyboard-only use, and a real two-browser live session.
   - **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog, phone width and 200% text, with zero violations.
@@ -135,12 +136,13 @@ flowchart LR
 ## Limitations
 
 - **Not yet tested with blind or motor-impaired users.** The design follows WCAG 2.2, the WAI-ARIA Authoring Practices and published guidance on accessible drag-and-drop, and the automated audit passes. That is not the same as real users saying it works. The next step is sessions with screen-reader users.
-- **Screen readers in browse mode** pass single-letter keys to the screen reader instead of the page. Enter on a card (action menu) and the command box always work. Help explains this.
+- **Screen reader modes.** The board is marked as an application, so screen readers should switch to focus mode when you land on a card, and arrows, Space and number keys reach Handrail. This follows the documented behaviour of NVDA and JAWS but hasn't been re-recorded with NVDA since the change. If a screen reader stays in browse mode, it keeps those keys for itself. Enter on a card (the action menu) and the command box work in either mode, and Help explains this.
+- **Share links grow with the board.** The sample board's link is about 2,000 characters, around Discord's message limit. Long links work in email and most chat apps, and "Download backup" works for any size.
 - **Live sessions need both people online at once**, and use public relays to connect. Some strict school or office networks block peer-to-peer connections; share links still work there. There is no always-on sync server, so a teammate who is offline catches up when they open a newer link.
 - **Merging picks a winner per field.** If two people edit the same field at the same moment, one version is kept (the later one) and the other person is told; the text isn't combined.
 - **Voice input** depends on the browser's speech recognition (Chrome and Edge, online). Typing commands works everywhere.
 - **English only** for commands and dates.
-- **Trello updates are manual.** Priya exports and re-imports the board; there is no Trello API connection. Changes Trello's activity log doesn't cover are credited to "Someone in Trello", and changes made in Handrail don't flow back to Trello.
+- **Trello updates are manual.** Priya exports and re-imports the board; there is no Trello API connection. Changes Trello's activity log doesn't cover are credited to "Someone in Trello", and changes made in Handrail don't flow back to Trello. Handrail has one assignee per card, so a Trello card with several members shows the first.
 
 ## Privacy
 
