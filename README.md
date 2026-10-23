@@ -23,6 +23,8 @@ Moving cards without a mouse is not new (GitHub Projects and Jira support keyboa
 
 WCAG 2.2 covers this in [2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html): anything done by dragging must also be possible without dragging.
 
+This isn't hypothetical. Trello has open NVDA bugs with "no known workaround", Jira's tracker says its board's drag-and-drop "is inaccessible to screen reader users", and research on blind people in shared tools recommends "accessible awareness" of what others changed. Sources: [docs/EVIDENCE.md](docs/EVIDENCE.md).
+
 **Handrail's user:** Priya, a blind student working with NVDA on a group project. Her teammates Riya and Arjun use the board with a mouse.
 
 ### Nobody has to switch from Trello
