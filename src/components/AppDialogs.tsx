@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { createBoard } from '../model/board';
-import { exportCsv, exportJson, exportMarkdown, importCsv, importHandrailJson, importTrello } from '../model/importers';
+import { exportCsv, exportJson, exportMarkdown, importCsv, importHandrailJson, importTrello, trelloAuthors } from '../model/importers';
 import { shareUrl } from '../model/share';
 import type { Board } from '../model/types';
 import type { Doc } from '../model/crdt';
@@ -75,6 +75,23 @@ export function SettingsDialog({ open, onClose, settings, onChange }: {
             </select>
           </div>
           <button type="button" className="btn btn-secondary" onClick={() => speak('This is how Handrail sounds.', settings.speechRate)}>Test the voice</button>
+        </fieldset>
+        <fieldset className="field">
+          <legend>Notifications</legend>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={settings.notify}
+              onChange={async (e) => {
+                const on = e.target.checked;
+                if (on && 'Notification' in window && Notification.permission === 'default') {
+                  const p = await Notification.requestPermission().catch(() => 'denied' as NotificationPermission);
+                  onChange({ notify: p === 'granted' });
+                } else onChange({ notify: on && 'Notification' in window && Notification.permission === 'granted' });
+              }}
+            />
+            Notify me about teammates’ live changes when Handrail is in the background
+          </label>
         </fieldset>
         <fieldset className="field">
           <legend>Motion</legend>
@@ -161,7 +178,8 @@ export function HelpDialog({ open, onClose, onChallenge, onStory }: { open: bool
             In Activity, <strong>Show me on the board</strong> points at each changed card, and <strong>Before / now</strong> flips the board to how it looked before, so you can compare.
           </p>
           <p>
-            Your group already uses Trello? Export the board from Trello as JSON and import it under <strong>Boards &amp; files</strong>.
+            Your group already uses Trello? Nobody has to switch. Export the board from Trello as JSON and import it under <strong>Boards &amp; files</strong>.
+            Next time, import the newer export: Handrail lists what changed in Trello since your last import, and who did it.
           </p>
         </section>
       </div>
@@ -274,7 +292,7 @@ export function BoardsDialog({
   onSwitch: (id: string) => void;
   onCreate: (b: Board) => void;
   onDelete: (id: string) => void;
-  onImported: (b: Board, source: string) => void;
+  onImported: (b: Board, source: string, authors?: Record<string, string>) => void;
   onTeammateDemo: () => void;
   onResetDemo: () => void;
   onRename: (title: string) => void;
@@ -297,6 +315,7 @@ export function BoardsDialog({
     const text = await file.text();
     let b: Board | null = null;
     let source = '';
+    let authors: ReturnType<typeof trelloAuthors> | undefined;
     if (/\.csv$/i.test(file.name) || file.type === 'text/csv') {
       b = importCsv(text, file.name.replace(/\.csv$/i, ''));
       source = 'CSV file';
@@ -305,6 +324,7 @@ export function BoardsDialog({
         const json = JSON.parse(text);
         b = importTrello(json);
         source = 'Trello';
+        if (b) authors = trelloAuthors(json);
         if (!b) {
           b = importHandrailJson(json);
           source = 'Handrail backup';
@@ -317,7 +337,7 @@ export function BoardsDialog({
       setStatus('I couldn’t read that file. Use a Trello JSON export, a Handrail backup, or a CSV with a Title column.');
       return;
     }
-    onImported(b, source);
+    onImported(b, source, authors);
   }
 
   return (
@@ -368,7 +388,7 @@ export function BoardsDialog({
             <label htmlFor="import-file">Choose a Trello JSON export, a Handrail backup, or a CSV file</label>
             <input id="import-file" type="file" accept=".json,.csv,application/json,text/csv" onChange={onFile} />
           </div>
-          <p className="hint">In Trello: open the board, then Menu → Print, export and share → Export as JSON.</p>
+          <p className="hint">In Trello: open the board, then Menu → Print, export and share → Export as JSON. Import a newer export of the same board to hear what changed since last time.</p>
           <p role="status" className="hint">{status}</p>
 
           <h3>Export “{board.title}”</h3>

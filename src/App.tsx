@@ -11,6 +11,7 @@ import { revertEdit } from './model/revert';
 import { summarize } from './model/summary';
 import { findColumn, findPerson } from './model/match';
 import { demoBoard } from './model/seed';
+import { TRELLO_SOMEONE } from './model/importers';
 import { docFromHash, parseHash } from './model/share';
 import { materialize } from './model/crdt';
 import type { Board } from './model/types';
@@ -29,7 +30,7 @@ import { Modal } from './components/Modal';
 const Landing = lazy(() => import('./components/Landing').then((m) => ({ default: m.Landing })));
 import { Blindfold } from './components/Blindfold';
 import { useMediaQuery } from './lib/useMediaQuery';
-import { CheckIcon, ChevronDownIcon, GearIcon, HelpIcon, RedoIcon, ShareIcon, UndoIcon } from './components/Icons';
+import { CheckIcon, ChevronDownIcon, CloseIcon, GearIcon, HelpIcon, RedoIcon, ShareIcon, UndoIcon } from './components/Icons';
 import type { ChangeKind } from './model/diff';
 import { CardActionsDialog, CardEditorDialog, ColumnDialog, type EditorValue } from './components/CardDialogs';
 import { BoardsDialog, HelpDialog, SettingsDialog, ShareDialog } from './components/AppDialogs';
@@ -38,14 +39,22 @@ type DialogName = 'settings' | 'help' | 'share' | 'boards' | null;
 
 const STORY_SEEN = 'handrail:story-seen';
 
-/** First-time visitors see the story; returning users and anyone opening a share link go straight to the board. */
+/**
+ * Everyone lands on the board. The story only opens when asked for (?story, or the
+ * "New here?" line), so nobody has to get through a scroll page to reach the work.
+ */
 function showStoryFirst(): boolean {
   try {
     if (window.location.hash.startsWith('#board=')) return false;
-    // A direct link to the eyes-closed challenge (for judges) goes straight to it.
-    if (new URLSearchParams(window.location.search).has('blindfold')) return false;
-    if (new URLSearchParams(window.location.search).has('story')) return true;
-    return !localStorage.getItem(STORY_SEEN) && !localStorage.getItem('handrail:v1');
+    return new URLSearchParams(window.location.search).has('story');
+  } catch {
+    return false;
+  }
+}
+
+function isNewHere(): boolean {
+  try {
+    return !localStorage.getItem(STORY_SEEN) && !localStorage.getItem('handrail:v1') && !window.location.hash.startsWith('#board=');
   } catch {
     return false;
   }
@@ -53,6 +62,7 @@ function showStoryFirst(): boolean {
 
 export default function App() {
   const [story, setStory] = useState(showStoryFirst);
+  const [newHere, setNewHere] = useState(isNewHere);
   const [arrived, setArrived] = useState(false);
   const store = useHandrail();
   const enter = useCallback(() => {
@@ -77,7 +87,7 @@ export default function App() {
           }}
         />
         </Suspense>
-      ) : <Shell store={store} arrived={arrived} onStory={() => { window.scrollTo(0, 0); setStory(true); }} />}
+      ) : <Shell store={store} arrived={arrived} newHere={newHere} onStory={() => { window.scrollTo(0, 0); setNewHere(false); setStory(true); }} />}
     </AnnouncerProvider>
   );
 }
@@ -104,7 +114,7 @@ function useToday(): Date {
   return useMemo(() => new Date(day), [day]);
 }
 
-function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => void; arrived: boolean }) {
+function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory: () => void; arrived: boolean; newHere: boolean }) {
   const { announce } = useAnnounce();
   const today = useToday();
   const { board, me, settings } = store;
@@ -127,6 +137,15 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
   const historyId = useRef(0);
   const [justMine, setJustMine] = useState(false);
   const [showBefore, setShowBefore] = useState(false);
+  const [welcome, setWelcome] = useState(newHere && !new URLSearchParams(window.location.search).has('blindfold'));
+  const dismissWelcome = () => {
+    setWelcome(false);
+    try {
+      localStorage.setItem(STORY_SEEN, '1');
+    } catch {
+      /* ignore */
+    }
+  };
   const [online, setOnline] = useState(() => navigator.onLine);
   useEffect(() => {
     const up = () => { setOnline(true); };
@@ -325,8 +344,17 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
   useEffect(() => {
     const { changes, seq } = store.liveArrivals;
     if (!seq || !changes.length) return;
-    announce(summarize(changes, me, today));
+    const text = summarize(changes, me, today);
+    announce(text);
     replayChanges(changes);
+    // In a background tab, and only if asked for: a system notification.
+    if (document.hidden && settings.notify && 'Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(`Handrail · ${store.board.title}`, { body: text, tag: 'handrail-live' });
+      } catch {
+        /* some browsers only allow notifications from a service worker */
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.liveArrivals.seq]);
 
@@ -345,6 +373,10 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
     if (arrived) {
       focusLater('board-switcher');
       announce(`Board opened: ${store.board.title}. Press slash to type a command, or Tab to reach the cards.`);
+    } else if (!window.location.hash.startsWith('#board=') && !store.changesAcknowledged && store.changes.length) {
+      // Unread teammates' changes from before: say so straight away.
+      const n = store.changes.length;
+      window.setTimeout(() => announce(`${n} ${n === 1 ? 'change is' : 'changes are'} waiting since you last looked. Say “what changed” to hear them.`), 400);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -516,9 +548,22 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
     setDialog(null);
   }
 
-  function importBoard(b: Board, source: string) {
-    store.createBoard(b);
+  function importBoard(b: Board, source: string, authors?: Record<string, string>) {
     setDialog(null);
+    if (authors) {
+      const r = store.importTrello(b, authors, TRELLO_SOMEONE);
+      if (r.updated) {
+        announce(r.changes
+          ? `Updated “${b.title}” from Trello. ${r.changes} ${r.changes === 1 ? 'change' : 'changes'} since your last import. Say “what changed” to hear them.`
+          : `Updated “${b.title}” from Trello. Nothing changed since your last import.`);
+        if (!r.changes) focusLater('board');
+        else if (wide) focusLater('changes');
+        else { lastFocus.current = null; setActivityOpen(true); }
+        return;
+      }
+    } else {
+      store.createBoard(b);
+    }
     const n = Object.keys(b.cards).length;
     announce(`Imported “${b.title}” from ${source}: ${b.columns.length} columns and ${n} ${n === 1 ? 'card' : 'cards'}.`);
     focusLater('board');
@@ -697,6 +742,27 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
       </header>
 
       <main id="main">
+        {welcome && (
+          <aside className="welcome" aria-label="New here">
+            <p>
+              <strong>New here?</strong> This sample board belongs to Priya, who is blind. Her teammates changed it overnight.
+            </p>
+            <div className="action-list">
+              <button type="button" className="btn btn-primary small" onClick={() => { dismissWelcome(); simulateTeammates(); }}>
+                See what changed
+              </button>
+              <button type="button" className="btn btn-secondary small" onClick={() => { dismissWelcome(); setBlindfold(true); }}>
+                Try it with your eyes closed
+              </button>
+              <button type="button" className="btn btn-quiet small" onClick={() => { dismissWelcome(); onStory(); }}>
+                1-minute story
+              </button>
+              <button type="button" className="btn btn-quiet small icon-only" aria-label="Dismiss" onClick={dismissWelcome}>
+                <CloseIcon size={18} />
+              </button>
+            </div>
+          </aside>
+        )}
         <div className="board-head">
           <h1>
             <button type="button" id="board-switcher" className="board-name" onClick={() => openDialog('boards')} aria-haspopup="dialog" aria-describedby="board-switcher-hint">

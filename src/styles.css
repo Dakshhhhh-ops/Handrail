@@ -909,3 +909,11 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .coming-up li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.25rem 0.5rem; padding: 0.4rem 0.7rem; border-radius: 12px; border: 1.5px solid var(--border); }
 .coming-up li.is-overdue { border-color: var(--danger); }
 .coming-up li.is-overdue span { color: var(--danger); }
+
+/* ---- First visit ------------------------------------------------------------------------ */
+.welcome {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem 1rem;
+  margin: 0.25rem 0 0.75rem; padding: 0.6rem 0.6rem 0.6rem 1rem;
+  border: 2px solid var(--butter); border-radius: var(--radius-lg); background: var(--accent-soft);
+}
+.welcome p { margin: 0; }

@@ -49,7 +49,7 @@ const SCENES = [
   { id: 'digest', label: 'Digest' },
   { id: 'keys', label: 'No dragging' },
   { id: 'merge', label: 'Merge' },
-  { id: 'live', label: 'Live' },
+  { id: 'live', label: 'Trello' },
   { id: 'built', label: 'Built' },
   { id: 'start', label: 'Start' },
 ];
@@ -199,7 +199,7 @@ export function Landing({ onEnter, onChallenge }: { onEnter: () => void; onChall
         tl.fromTo(q('.m-conflict'), { autoAlpha: 0, scale: 0.4, rotation: -12 }, { autoAlpha: 1, scale: 1, rotation: 3, duration: 0.2, ease: 'back.out(2)' }, 3.8);
         tl.addLabel('merge', 4);
 
-        // 4 → 5 Live: two people at once, read out as it happens.
+        // 4 → 5 Trello: teammates keep working in Trello; Handrail reads out what they changed.
         tl.to(q('.m-conflict'), { autoAlpha: 0, duration: 0.15 }, 4);
         tl.to(q('.iso-plane'), { rotationX: 30, rotationZ: -12, scale: 0.95, y: -20, duration: 0.3 }, 4);
         tl.fromTo(q('.m-cursor-r'), { x: 600, y: 360, autoAlpha: 0 }, { x: 140, y: 100, autoAlpha: 1, duration: 0.4 }, 4.15);
@@ -334,11 +334,11 @@ export function Landing({ onEnter, onChallenge }: { onEnter: () => void; onChall
           </section>
 
           <section className="scene" aria-labelledby="sc-live">
-            <p className="kicker">05 · Live</p>
-            <h2 id="sc-live">Or work at the same time.</h2>
+            <p className="kicker">05 · Keep Trello</p>
+            <h2 id="sc-live">Nobody has to switch.</h2>
             <p>
-              Start a live session and browsers connect to each other directly. Each teammate’s edit lands on your board and is read out as it happens: “Riya
-              moved Design slides to Done.” There is no account and no Handrail server.
+              Your group stays in Trello. Import its export, and next time import the newer one: Handrail tells you what changed in Trello since, and who
+              did it, from Trello’s own activity log.
             </p>
           </section>
 
@@ -419,7 +419,7 @@ export function Landing({ onEnter, onChallenge }: { onEnter: () => void; onChall
             <div className="m-copy m-copy-b"><b>Riya’s copy</b><span /><span /><span /></div>
             <div className="m-conflict">Both changed the due date · kept the later edit</div>
 
-            <div className="m-caption">🔊 Riya moved “Design slides” to Done.</div>
+            <div className="m-caption">🔊 Since your last import: Riya moved “Email Dr. Mehta” to Doing.</div>
           </div>
         </div>
       </div>

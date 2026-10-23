@@ -24,6 +24,39 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Climate talk: group project');
 });
 
+test.describe('works on top of Trello', () => {
+  const lists = [{ id: 'L1', name: 'To Do', pos: 1 }, { id: 'L2', name: 'Doing', pos: 2 }];
+  const riya = { fullName: 'Riya Sharma' };
+  const file = (data: object) => ({ name: 'trello-export.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(data)) });
+
+  test('re-importing a newer Trello export tells you what changed there, and who did it', async ({ page }) => {
+    await page.locator('#board-switcher').click();
+    await page.locator('#import-file').setInputFiles(file({
+      id: 'B1', name: 'Bio lab', lists, cards: [{ id: 'c1', name: 'Write method', idList: 'L1', pos: 1 }], actions: [],
+    }));
+    await expect(live(page)).toContainText('Imported “Bio lab” from Trello');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bio lab');
+
+    await page.locator('#board-switcher').click();
+    await page.locator('#import-file').setInputFiles(file({
+      id: 'B1', name: 'Bio lab', lists,
+      cards: [{ id: 'c1', name: 'Write method', idList: 'L2', pos: 1 }, { id: 'c2', name: 'Abstract', idList: 'L1', pos: 1 }],
+      actions: [
+        { date: '2026-10-22T10:00:00.000Z', memberCreator: riya, data: { card: { id: 'c2' } } },
+        { date: '2026-10-22T09:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' } } },
+      ],
+    }));
+    await expect(live(page)).toContainText('Updated “Bio lab” from Trello. 2 changes since your last import.');
+    const list = page.getByTestId('change-list');
+    await expect(list).toContainText('Riya Sharma moved “Write method” from To Do to Doing.');
+    await expect(list).toContainText('Riya Sharma added “Abstract” to To Do.');
+    // Still one board, not a copy.
+    await page.locator('#board-switcher').click();
+    const yours = page.getByRole('dialog', { name: 'Boards & files' }).getByRole('region', { name: 'Your boards' }).getByRole('listitem');
+    await expect(yours.filter({ hasText: 'Bio lab' })).toHaveCount(1);
+  });
+});
+
 test.describe('keyboard only', () => {
   test('skip link, pick up a card with Space, move it with arrows, drop with Enter', async ({ page }) => {
     await page.keyboard.press('Tab');
@@ -303,6 +336,13 @@ test.describe('activity panel', () => {
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   });
 
+  test('unread changes are announced when you come back later', async ({ page }) => {
+    await simulate(page);
+    await page.reload();
+    await expect(live(page)).toContainText('4 changes are waiting since you last looked');
+    await expect(page).toHaveTitle(/^\(4\) Climate talk/);
+  });
+
   test('cards teammates changed are marked on the board until you press Got it', async ({ page }) => {
     await simulate(page);
     const email = cardIn(page, 'To do', 'Email Dr. Mehta');
@@ -557,24 +597,34 @@ test.describe('automated accessibility audit (axe, WCAG 2.2 AA)', () => {
 });
 
 test.describe('the story (first visit)', () => {
-  test('first-time visitors see the story; “Open the board” is the first thing to Tab to', async ({ browser }) => {
+  test('first-time visitors land on the board, with the story and challenge one click away', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const page = await ctx.newPage();
     await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+    const welcome = page.getByRole('complementary', { name: 'New here' });
+    await expect(welcome).toBeVisible();
+    await welcome.getByRole('button', { name: '1-minute story' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Never hunt for what changed\./);
     await page.keyboard.press('Tab');
     await expect(page.getByRole('button', { name: 'Open the board' }).first()).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
     await expect(page.locator('#board-switcher')).toBeFocused();
     await expect(page.getByTestId('live-region')).toContainText('Board opened');
-    // Returning visitors go straight to the board.
+    await expect(page.getByRole('complementary', { name: 'New here' })).toHaveCount(0);
+    // Returning visitors go straight to the board, without the welcome line.
     await page.reload();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
-    // And the story is one click away.
-    await page.getByRole('button', { name: 'Help' }).click();
-    await page.getByRole('button', { name: 'Watch the story' }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Never hunt/);
+    await expect(page.getByRole('complementary', { name: 'New here' })).toHaveCount(0);
+    await ctx.close();
+  });
+
+  test('“See what changed” on the welcome line runs the teammate demo', async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    await page.goto('/');
+    await page.getByRole('button', { name: 'See what changed' }).click();
+    await expect(page.getByTestId('changes')).toContainText('4');
     await ctx.close();
   });
 
@@ -582,7 +632,6 @@ test.describe('the story (first visit)', () => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await page.goto('/');
-    await page.getByRole('button', { name: 'Open the board' }).first().click();
     await page.getByRole('button', { name: 'Share' }).click();
     const link = await page.getByLabel(/Link to/).inputValue();
     const fresh = await (await browser.newContext()).newPage();
