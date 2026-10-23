@@ -23,6 +23,11 @@ interface Grab {
   origin: Board;
 }
 
+/** Browsers don't always scroll a nested scroller to show what just got focus (WCAG 2.4.11), so do it here. */
+export function revealFocus(e: { target: EventTarget }) {
+  (e.target as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+}
+
 function initials(name: string) {
   return name.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 }
@@ -352,7 +357,7 @@ export function BoardView({
 
   return (
     <>
-    <div className={`board-wrap layout-${layout}`}>
+    <div className={`board-wrap layout-${layout}`} onFocus={revealFocus}>
     <div
       id="board"
       className={`board${grab ? ' is-grabbing' : ''}`}

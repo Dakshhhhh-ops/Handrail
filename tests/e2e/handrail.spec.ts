@@ -431,6 +431,29 @@ test.describe('phones and large text', () => {
     expect(box.y + box.height).toBeLessThanOrEqual(dockTop);
   });
 
+  test('focus inside the scrolling board and Activity list is always scrolled into view', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 700 });
+    await simulate(page);
+    await page.getByRole('button', { name: 'Got it' }).click();
+    await page.getByRole('button', { name: 'Show changes' }).click();
+    const wrap = page.locator('.board-wrap');
+    const visible = async (loc: ReturnType<Page['locator']>, scroller: ReturnType<Page['locator']>) => {
+      const a = (await loc.boundingBox())!;
+      const b = (await scroller.boundingBox())!;
+      return a.x >= b.x - 1 && a.x + a.width <= b.x + b.width + 1 && a.y >= b.y - 1 && a.y + a.height <= b.y + b.height + 1;
+    };
+    // Board scrolled right, then focus moves to a card on the left.
+    await page.locator('[data-card]').first().focus();
+    await wrap.evaluate((el) => (el.scrollLeft = el.scrollWidth));
+    await page.keyboard.press('ArrowDown');
+    expect(await visible(page.locator('[data-card]:focus'), wrap)).toBe(true);
+    // Tabbing through the Activity list keeps each control on screen.
+    const scroller = page.locator('.activity-scroll');
+    await scroller.evaluate((el) => (el.scrollTop = 0));
+    await page.getByTestId('change-list').getByRole('button').last().focus();
+    expect(await visible(page.locator(':focus'), scroller)).toBe(true);
+  });
+
   for (const width of [320, 768, 1280]) {
     test(`200% text at ${width}px: no sideways scrolling, command box usable`, async ({ page }) => {
       await page.setViewportSize({ width, height: 800 });

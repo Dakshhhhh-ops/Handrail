@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CheckIcon, WarningIcon } from './Icons';
+import { revealFocus } from './BoardView';
 
 /** ✓ or ⚠ before a reply, with words for screen readers, so success and failure never rely on colour alone. */
 export function ReplyStatus({ ok }: { ok?: boolean }) {
@@ -121,7 +122,7 @@ export function ActivityContent({
           Activity
         </h2>
       )}
-      <div className="activity-scroll" tabIndex={0} role="region" aria-label="Changes and command history">
+      <div className="activity-scroll" tabIndex={0} role="region" aria-label="Changes and command history" onFocus={revealFocus}>
         {changes}
         <History entries={history} />
       </div>
