@@ -62,7 +62,7 @@ function CardFace({ board, card, today, me, grabbed, change }: { board: Board; c
           {change}
         </span>
       )}
-      <span className="focus-tag" aria-hidden="true">You</span>
+
       {(due || card.assignee || card.notes.trim()) && (
         <span className="card-meta" aria-hidden="true">
           {due && (

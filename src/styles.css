@@ -199,6 +199,16 @@ q { quotes: '“' '”'; }
   outline-offset: 3px;
 }
 [tabindex='-1']:focus:not(:focus-visible) { outline: none; }
+/* Fields on night panels: the ring sits on the dark panel, so use the bright focus colour (5:1+). */
+:is(.activity, .dock, .modal-full) :is(input, textarea, select):focus-visible { outline-color: var(--sky); }
+:root[data-theme='light'] :is(.activity, .dock, .modal-full) :is(input, textarea, select):focus-visible { outline-color: #4fb3ff; }
+@media (prefers-color-scheme: light) { :root[data-theme='system'] :is(.activity, .dock, .modal-full) :is(input, textarea, select):focus-visible { outline-color: #4fb3ff; } }
+:root[data-theme='contrast'] :is(.activity, .dock, .modal-full) :is(input, textarea, select):focus-visible { outline-color: #ff7bff; }
+/* A dialog only holds focus for a moment while it opens; its controls show their own rings. */
+dialog:focus-visible { outline: none; }
+.skip-link:focus-visible { outline-color: #4fb3ff; }
+/* Capitals are harder to read with dyslexia; drop them when the reader chose a reading font or spacing. */
+:root:is([data-font='opendyslexic'], [data-font='system'], [data-spacing='relaxed']) * { text-transform: none !important; }
 [hidden] { display: none !important; }
 
 .sr-only {
@@ -384,7 +394,8 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .notice { padding: 0.6rem 0.8rem; background: var(--today-bg); color: var(--today-fg); border-radius: 12px; margin: 0; }
 
 /* ---- Board ---------------------------------------------------------------------- */
-.board-wrap { overflow-x: auto; padding: 0.9rem 0.25rem 0.75rem; margin: -0.9rem -0.25rem 0; }
+/* Room on every side for the selection handles, which reach 10px outside a card. */
+.board-wrap { overflow-x: auto; padding: 0.9rem 1rem 0.75rem; margin: -0.9rem -1rem 0; }
 .board { display: flex; gap: 1.1rem; align-items: flex-start; min-width: min-content; }
 .layout-stacked .board { flex-direction: column; align-items: stretch; min-width: 0; }
 .column {
@@ -486,20 +497,7 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
     linear-gradient(var(--focus), var(--focus)) bottom left / var(--h) var(--h) no-repeat,
     linear-gradient(var(--focus), var(--focus)) bottom right / var(--h) var(--h) no-repeat;
 }
-.focus-tag {
-  display: none;
-  position: absolute;
-  right: -10px;
-  bottom: -2rem;
-  padding: 0.05rem 0.45rem;
-  border-radius: 4px;
-  background: var(--focus);
-  color: #0c0c16;
-  font-size: 0.75rem;
-  font-weight: 800;
-  z-index: 2;
-}
-.card:focus-visible .focus-tag { display: block; }
+
 
 /* A teammate changed this card: their colour on the edge and a multiplayer name tag. */
 .card.has-change { box-shadow: inset 5px 0 0 var(--pc, var(--butter)), var(--hard); padding-left: 1.2rem; }
