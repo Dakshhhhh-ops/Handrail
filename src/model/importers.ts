@@ -5,7 +5,8 @@ import type { Board, Card } from './types';
 
 /**
  * Imports the JSON file Trello gives you from Board menu → Print, export and share → Export as JSON.
- * Archived lists and cards are skipped.
+ * Archived lists and cards are skipped. Ids come from Trello's own ids, so importing a newer
+ * export of the same board updates it instead of making a copy.
  */
 export function importTrello(raw: unknown): Board | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -24,9 +25,9 @@ export function importTrello(raw: unknown): Board | null {
   const cards = (r.cards as C[]).filter((c) => c && !c.closed && typeof c.name === 'string').sort((a, b) => a.pos - b.pos);
 
   const board: Board = {
-    id: newId('b'),
+    id: trelloId('t', r.id),
     title: typeof r.name === 'string' && r.name.trim() ? r.name : 'Imported from Trello',
-    columns: lists.map((l) => ({ id: newId('c'), title: String(l.name || 'Untitled'), cardIds: [] as string[] })),
+    columns: lists.map((l) => ({ id: trelloId('tl', l.id), title: String(l.name || 'Untitled'), cardIds: [] as string[] })),
     cards: {},
     updatedAt: Date.now(),
   };
@@ -34,7 +35,8 @@ export function importTrello(raw: unknown): Board | null {
   for (const c of cards) {
     const col = colByList.get(c.idList);
     if (!col) continue;
-    const id = newId('k');
+    const id = trelloId('tc', c.id);
+    if (board.cards[id]) continue;
     const due = typeof c.due === 'string' ? c.due.slice(0, 10) : null;
     const assignee = (c.idMembers ?? []).map((m) => members.get(m)).find(Boolean) ?? null;
     board.cards[id] = {
@@ -46,6 +48,37 @@ export function importTrello(raw: unknown): Board | null {
   if (board.columns.length === 0) return null;
   return validateBoard(board);
 }
+
+/** Handrail ids for Trello's ids (24 hex characters), or a fresh id for anything odd. */
+function trelloId(prefix: string, id: unknown): string {
+  return typeof id === 'string' && /^[A-Za-z0-9]{1,40}$/.test(id) ? `${prefix}-${id}` : newId(prefix);
+}
+
+/**
+ * Who last touched each card, from the activity log Trello includes in its export
+ * (the newest action per card wins). Used to credit changes on a re-import.
+ */
+export function trelloAuthors(raw: unknown): Record<string, string> {
+  const byCard: Record<string, string> = {};
+  const when: Record<string, string> = {};
+  const actions = raw && typeof raw === 'object' && Array.isArray((raw as { actions?: unknown }).actions)
+    ? ((raw as { actions: unknown[] }).actions)
+    : [];
+  for (const a of actions.slice(0, 5000)) {
+    if (!a || typeof a !== 'object') continue;
+    const act = a as { date?: unknown; memberCreator?: { fullName?: unknown; username?: unknown }; data?: { card?: { id?: unknown } } };
+    const who = String(act.memberCreator?.fullName || act.memberCreator?.username || '').trim().slice(0, 60);
+    const at = typeof act.date === 'string' ? act.date : '';
+    const cardId = act.data?.card?.id;
+    if (!who || typeof cardId !== 'string') continue;
+    const id = trelloId('tc', cardId);
+    if (!when[id] || at >= when[id]) { byCard[id] = who; when[id] = at; }
+  }
+  return byCard;
+}
+
+/** Credited for Trello changes that its activity log doesn't cover. */
+export const TRELLO_SOMEONE = 'Someone in Trello';
 
 /** Imports a board saved with Handrail's own "Download backup". */
 export function importHandrailJson(raw: unknown): Board | null {

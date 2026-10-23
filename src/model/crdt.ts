@@ -240,9 +240,13 @@ export function assignKeys(existing: (string | null)[], moved: boolean[] = []): 
  * Records the difference between the document and an edited board view as new
  * register writes by `actor`. Returns the same document when nothing changed.
  */
-export function commit(doc: Doc, after: Board, actor: string, by: string | null, now = Date.now()): Doc {
+export function commit(
+  doc: Doc, after: Board, actor: string, by: string | null, now = Date.now(),
+  /** Who made each card's change, when one write carries several people's edits (a Trello re-import). */
+  byCard?: Record<string, string>,
+): Doc {
   const c = doc.clock + 1;
-  const reg = <T,>(v: T): Reg<T> => ({ v, c, t: now, a: actor, by });
+  const reg = <T,>(v: T, who: string | null = by): Reg<T> => ({ v, c, t: now, a: actor, by: who });
   const next: Doc = { ...doc, cols: { ...doc.cols }, cards: { ...doc.cards } };
   let dirty = false;
 
@@ -298,30 +302,31 @@ export function commit(doc: Doc, after: Board, actor: string, by: string | null,
       if (!card) return;
       const place: Place = { col: col.id, pos: keys[i] };
       const rec = doc.cards[id];
+      const who = byCard?.[id] ?? by;
       if (!rec) {
         next.cards[id] = {
-          title: reg(card.title), notes: reg(card.notes), due: reg(card.due), assignee: reg(card.assignee),
-          place: reg(place), alive: reg(true),
+          title: reg(card.title, who), notes: reg(card.notes, who), due: reg(card.due, who), assignee: reg(card.assignee, who),
+          place: reg(place, who), alive: reg(true, who),
         };
         dirty = true;
         return;
       }
       const patch: CardRec = { ...rec };
       let changed = false;
-      if (!rec.alive.v) { patch.alive = reg(true); changed = true; }
+      if (!rec.alive.v) { patch.alive = reg(true, who); changed = true; }
       for (const f of CARD_FIELDS) {
         if (rec[f].v !== card[f]) {
-          (patch[f] as Reg<string | null>) = reg(card[f]);
+          (patch[f] as Reg<string | null>) = reg(card[f], who);
           changed = true;
         }
       }
-      if (rec.place.v.col !== place.col || rec.place.v.pos !== place.pos) { patch.place = reg(place); changed = true; }
+      if (rec.place.v.col !== place.col || rec.place.v.pos !== place.pos) { patch.place = reg(place, who); changed = true; }
       if (changed) { next.cards[id] = patch; dirty = true; }
     });
   }
   for (const [id, rec] of Object.entries(doc.cards)) {
     if (rec.alive.v && !seenCards.has(id)) {
-      next.cards[id] = { ...rec, alive: reg(false) };
+      next.cards[id] = { ...rec, alive: reg(false, byCard?.[id] ?? by) };
       dirty = true;
     }
   }
@@ -333,8 +338,8 @@ export function commit(doc: Doc, after: Board, actor: string, by: string | null,
 }
 
 /** A brand-new document holding `board`, written by `actor`. */
-export function docFromBoard(board: Board, actor: string, by: string | null, now = Date.now()): Doc {
-  return commit(emptyDoc(board.id), board, actor, by, now);
+export function docFromBoard(board: Board, actor: string, by: string | null, now = Date.now(), byCard?: Record<string, string>): Doc {
+  return commit(emptyDoc(board.id), board, actor, by, now, byCard);
 }
 
 // ---- Conflicts ---------------------------------------------------------------
