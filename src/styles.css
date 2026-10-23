@@ -77,7 +77,11 @@
 
 /* ---- Base --------------------------------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  /* Keep focused things clear of the sticky shortcut strip and the phone dock (WCAG 2.4.11). */
+  scroll-padding-bottom: calc(var(--dock-h, 0px) + 4.5rem);
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -249,9 +253,11 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 
 /* ---- Layout: board + Activity panel ------------------------------------- */
 .layout { flex: 1; display: block; }
-.layout.is-wide { display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 430px); align-items: start; }
+.main-col { min-width: 0; display: flex; flex-direction: column; min-height: 100vh; }
+.main-col main { flex: 1; }
+.layout.is-wide { display: grid; grid-template-columns: minmax(0, 1fr) clamp(20rem, 30vw, 27rem); align-items: start; }
 .layout.is-wide main { max-width: none; min-width: 0; }
-.layout.is-narrow ~ .footer { padding-bottom: calc(var(--dock-h, 0px) + 1rem); }
+.layout.is-narrow .footer { padding-bottom: calc(var(--dock-h, 0px) + 1rem); }
 
 .activity {
   position: sticky;
@@ -293,8 +299,8 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 /* ---- Command bar -------------------------------------------------------- */
 .command-form { display: flex; flex-direction: column; gap: 0.4rem; }
 .command-label { font-weight: 700; }
-.command-row { display: flex; gap: 0.4rem; }
-.command-input { flex: 1 1 auto; min-width: 0; font-size: 1.05rem; min-height: 48px; }
+.command-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.command-input { flex: 1 1 10rem; min-width: 0; font-size: 1.05rem; min-height: 48px; }
 .command-row .btn { flex: none; padding-inline: 0.75rem; }
 .mic.is-listening { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
 .preview { margin: 0; font-size: 0.95rem; color: var(--accent); font-weight: 700; overflow-wrap: anywhere; }
@@ -396,6 +402,7 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .change-list li.for-you { background: var(--news-soft); color: var(--text); }
 .flag { display: inline-block; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 0 0.5rem; border-radius: 999px; background: var(--news-text); color: var(--surface); margin-right: 0.25rem; }
 :root[data-theme='contrast'] .flag { background: var(--news); color: #000; }
+.pill-live { background: var(--accent); color: var(--accent-ink); }
 .pill { display: inline-block; font-family: var(--mono); font-size: 0.8rem; font-weight: 700; padding: 0.05rem 0.5rem; border-radius: 999px; background: var(--news-text); color: var(--surface); margin-left: 0.4rem; vertical-align: middle; }
 :root[data-theme='contrast'] .pill { background: var(--news); color: #000; }
 .toggle.is-on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
@@ -557,11 +564,15 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .footer { padding: 1rem; text-align: center; color: var(--muted); border-top: 1px solid var(--border); }
 .footer p { margin: 0; }
 
-@media (max-width: 640px) {
-  main { padding: 1rem; }
-  .board-head h1 { font-size: 1.25rem; }
-  .toolbar .btn { flex: 1 1 auto; }
-  .board { flex-direction: column; align-items: stretch; min-width: 0; }
-  .column { flex-basis: auto; max-width: none; min-width: 0; }
-  .column-add { flex-basis: auto; }
-}
+:root[data-compact] main { padding: 1rem; }
+:root[data-compact] .board-head h1 { font-size: 1.25rem; }
+:root[data-compact] .board { flex-direction: column; align-items: stretch; min-width: 0; }
+:root[data-compact] .column { flex-basis: auto; max-width: none; min-width: 0; }
+:root[data-compact] .column-add { flex-basis: auto; }
+:root[data-compact] .toolbar { gap: 0.25rem; }
+:root[data-compact] .toolbar .btn { flex: none; min-width: 44px; padding-inline: 0.5rem; }
+:root[data-compact] .toolbar .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:root[data-compact] .topbar { flex-wrap: nowrap; padding-inline: 0.75rem; }
+:root[data-compact] .toolbar { flex-wrap: nowrap; }
+:root[data-compact] .brand-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+

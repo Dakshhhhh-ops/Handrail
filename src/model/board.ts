@@ -47,8 +47,8 @@ export function addCard(
   const id = newId('k');
   const card: Card = {
     id,
-    title: input.title.trim(),
-    notes: input.notes?.trim() ?? '',
+    title: input.title.trim().slice(0, 200),
+    notes: (input.notes?.trim() ?? '').slice(0, 5000),
     due: input.due ?? null,
     assignee: input.assignee?.trim() || null,
     lastEditedBy: by,
@@ -85,7 +85,8 @@ export function updateCard(board: Board, cardId: string, patch: Partial<Omit<Car
   const card = board.cards[cardId];
   if (!card) return board;
   const next: Card = { ...card, ...patch, lastEditedBy: by, updatedAt: Date.now() };
-  if (patch.title !== undefined) next.title = patch.title.trim() || card.title;
+  if (patch.title !== undefined) next.title = patch.title.trim().slice(0, 200) || card.title;
+  if (patch.notes !== undefined) next.notes = patch.notes.slice(0, 5000);
   if (patch.assignee !== undefined) next.assignee = patch.assignee?.trim() || null;
   return touch(board, board.columns, { ...board.cards, [cardId]: next });
 }

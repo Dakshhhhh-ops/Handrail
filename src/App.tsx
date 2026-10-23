@@ -21,7 +21,7 @@ import { ActivityContent, LiveBar, NamePrompt, type HistoryEntry, type LiveStatu
 import { createSession, newRoomCode, trysteroTransport, type LiveSession } from './lib/live';
 import { Modal } from './components/Modal';
 import { useMediaQuery } from './lib/useMediaQuery';
-import { CheckIcon, ChevronDownIcon, RedoIcon, UndoIcon } from './components/Icons';
+import { CheckIcon, ChevronDownIcon, GearIcon, HelpIcon, RedoIcon, ShareIcon, UndoIcon } from './components/Icons';
 import type { ChangeKind } from './model/diff';
 import { CardActionsDialog, CardEditorDialog, ColumnDialog, type EditorValue } from './components/CardDialogs';
 import { BoardsDialog, HelpDialog, SettingsDialog, ShareDialog } from './components/AppDialogs';
@@ -73,7 +73,10 @@ function Shell({ store }: { store: Handrail }) {
   const [focusTarget, setFocusTarget] = useState<{ id: string; n: number } | null>(null);
   const lastFocus = useRef<HTMLElement | null>(null);
   const justOpened = useRef<string | null>(null);
-  const wide = useMediaQuery('(min-width: 1000px)');
+  // Breakpoints follow the chosen text size: at 200% text a 1280px window has the room of a 640px one.
+  const scale = store.settings.textSize / 100;
+  const wide = useMediaQuery(`(min-width: ${Math.round(1000 * scale)}px)`);
+  const compact = useMediaQuery(`(max-width: ${Math.round(640 * scale)}px)`);
   const [activityOpen, setActivityOpen] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const historyId = useRef(0);
@@ -141,6 +144,11 @@ function Shell({ store }: { store: Handrail }) {
     root.dataset.motion = settings.reduceMotion ? 'reduce' : 'auto';
     root.style.fontSize = `${settings.textSize}%`;
   }, [settings]);
+
+  useEffect(() => {
+    if (compact) document.documentElement.dataset.compact = '';
+    else delete document.documentElement.dataset.compact;
+  }, [compact]);
 
   useEffect(() => {
     document.title = `${board.title} · Handrail`;
@@ -511,6 +519,8 @@ function Shell({ store }: { store: Handrail }) {
       <a className="skip-link" href="#command-input" onClick={(e) => { e.preventDefault(); focusLater('command-input'); }}>
         Skip to the command box
       </a>
+      <div className={`layout ${wide ? 'is-wide' : 'is-narrow'}`}>
+      <div className="main-col">
       <header className="topbar">
         <div className="brand">
           <span className="logo" aria-hidden="true">
@@ -520,18 +530,23 @@ function Shell({ store }: { store: Handrail }) {
         </div>
         <nav aria-label="Board tools" className="toolbar">
           <button type="button" className="btn btn-quiet" onClick={undo} disabled={!store.canUndo} title={store.undoLabel ? `Undo: ${store.undoLabel}` : 'Nothing to undo'}>
-            <UndoIcon /> Undo
+            <UndoIcon /> <span className="btn-label">Undo</span>
           </button>
           <button type="button" className="btn btn-quiet" onClick={redo} disabled={!store.canRedo} title={store.redoLabel ? `Redo: ${store.redoLabel}` : 'Nothing to redo'}>
-            <RedoIcon /> Redo
+            <RedoIcon /> <span className="btn-label">Redo</span>
           </button>
-          <button type="button" className="btn btn-secondary" onClick={() => openDialog('share')}>Share</button>
-          <button type="button" className="btn btn-secondary" onClick={() => openDialog('settings')}>Settings</button>
-          <button type="button" className="btn btn-secondary" onClick={() => openDialog('help')}>Help</button>
+          <button type="button" className="btn btn-secondary" onClick={() => openDialog('share')}>
+            <ShareIcon /> <span className="btn-label">Share</span>
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => openDialog('settings')}>
+            <GearIcon /> <span className="btn-label">Settings</span>
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => openDialog('help')}>
+            <HelpIcon /> <span className="btn-label">Help</span>
+          </button>
         </nav>
       </header>
 
-      <div className={`layout ${wide ? 'is-wide' : 'is-narrow'}`}>
       <main id="main">
         <div className="board-head">
           <h1>
@@ -560,6 +575,12 @@ function Shell({ store }: { store: Handrail }) {
             changed={changedCards}
           />
       </main>
+      <footer className="footer">
+        <p>
+          Handrail keeps your boards on this device. No account, no tracking. <a href="https://github.com/Dakshhhhh-ops/Handrail">Source code</a>
+        </p>
+      </footer>
+      </div>
       {wide && (
         <aside className="activity" id="activity" aria-labelledby="activity-h">
           <ActivityContent changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} preview={previewText} />} />
@@ -567,18 +588,14 @@ function Shell({ store }: { store: Handrail }) {
       )}
       </div>
 
-      <footer className="footer">
-        <p>
-          Handrail keeps your boards on this device. No account, no tracking. <a href="https://github.com/Dakshhhhh-ops/Handrail">Source code</a>
-        </p>
-      </footer>
-
-      {!wide && !activityOpen && (
+      {!wide && (
         <div className="dock" id="activity" role="region" aria-label="Commands and activity" ref={dockRef}>
-          <button type="button" className="btn btn-secondary dock-activity" onClick={openActivity} aria-haspopup="dialog">
+          <button type="button" id="dock-activity" className="btn btn-secondary dock-activity" onClick={openActivity} aria-haspopup="dialog">
             Activity{unread > 0 && <span className="pill">{unread}<span className="sr-only"> new</span></span>}
+            {live && <span className="pill pill-live">live</span>}
           </button>
-          <CommandBar onRun={runCommand} preview={previewText} lastReply={history.filter((h) => h.who === 'handrail').at(-1) ?? null} />
+          {/* Only one command box exists at a time: the dialog has its own while it is open. */}
+          {!activityOpen && <CommandBar onRun={runCommand} preview={previewText} lastReply={history.filter((h) => h.who === 'handrail').at(-1) ?? null} />}
         </div>
       )}
       {!wide && (

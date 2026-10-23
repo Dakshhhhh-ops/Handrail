@@ -397,6 +397,45 @@ test('mouse users can still drag and drop', async ({ page }) => {
   await expect(cardIn(page, 'Done', 'Design slides')).toBeVisible();
 });
 
+test.describe('phones and large text', () => {
+  test('closing Activity on a phone puts focus back on the Activity button', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 700 });
+    const button = page.getByRole('button', { name: /^Activity/ });
+    await button.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog', { name: 'Activity' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(button).toBeFocused();
+  });
+
+  test('a focused card is never hidden behind the phone dock (WCAG 2.4.11)', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 700 });
+    await simulate(page);
+    await page.keyboard.press('Escape');
+    await page.locator('[data-card]').first().focus();
+    for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowDown');
+    const focused = page.locator('[data-card]:focus');
+    const box = (await focused.boundingBox())!;
+    const dockTop = (await page.locator('.dock').boundingBox())!.y;
+    expect(box.y + box.height).toBeLessThanOrEqual(dockTop);
+  });
+
+  for (const width of [320, 768, 1280]) {
+    test(`200% text at ${width}px: no sideways scrolling, command box usable`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await page.getByRole('button', { name: 'Settings' }).click();
+      await page.getByLabel('Text size').selectOption('200');
+      await page.getByRole('button', { name: 'Done', exact: true }).click();
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(0);
+      // Large text gets the roomy phone layout, with the command box docked full width.
+      await expect(page.locator('.dock')).toBeVisible();
+      const input = (await page.locator('#command-input').boundingBox())!;
+      expect(input.width).toBeGreaterThan(Math.min(width - 160, 240));
+    });
+  }
+});
+
 test('settings persist after reload', async ({ page }) => {
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByLabel('High contrast').check();

@@ -373,7 +373,7 @@ function validKey(k: unknown): k is string {
   }
 }
 
-function vReg<T>(raw: unknown, check: (v: unknown) => v is T): Reg<T> | null {
+function vReg<T>(raw: unknown, check: (v: unknown) => v is T, max = 0): Reg<T> | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   if (typeof r.c !== 'number' || !Number.isInteger(r.c) || r.c < 0 || r.c > 1e12) return null;
@@ -381,9 +381,12 @@ function vReg<T>(raw: unknown, check: (v: unknown) => v is T): Reg<T> | null {
   const t = r.t === undefined ? 0 : r.t;
   if (typeof t !== 'number' || !Number.isFinite(t) || t < 0 || t > 1e14) return null;
   if (typeof r.a !== 'string' || !ACTOR.test(r.a)) return null;
-  if (!(r.by === null || (typeof r.by === 'string' && r.by.length <= 60))) return null;
-  if (!check(r.v)) return null;
-  return { v: r.v, c: r.c, t, a: r.a, by: (r.by as string | null) ?? null };
+  if (!(r.by === null || r.by === undefined || typeof r.by === 'string')) return null;
+  // Over-long text is cut to size rather than throwing away the whole card.
+  const v = max && typeof r.v === 'string' ? r.v.slice(0, max) : r.v;
+  if (!check(v)) return null;
+  const by = typeof r.by === 'string' ? r.by.slice(0, 60) : null;
+  return { v, c: r.c, t, a: r.a, by };
 }
 
 const str = (max: number) => (v: unknown): v is string => typeof v === 'string' && v.length <= max;
@@ -400,13 +403,13 @@ export function validateDoc(raw: unknown): Doc | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   if (r.kind !== 'handrail-doc' || r.v !== 2 || typeof r.id !== 'string' || !ID.test(r.id)) return null;
-  const title = vReg(r.title, str(200));
+  const title = vReg(r.title, str(200), 200);
   if (!title) return null;
   const cols: Record<string, ColRec> = {};
   for (const [id, raw] of Object.entries((r.cols as Record<string, unknown>) ?? {}).slice(0, 40)) {
     const x = raw as Record<string, unknown>;
     if (!ID.test(id) || !x) continue;
-    const t = vReg(x.title, str(200)), p = vReg(x.pos, validKey), al = vReg(x.alive, bool);
+    const t = vReg(x.title, str(200), 200), p = vReg(x.pos, validKey), al = vReg(x.alive, bool);
     if (t && p && al) cols[id] = { title: t, pos: p, alive: al };
   }
   const cards: Record<string, CardRec> = {};
@@ -414,8 +417,8 @@ export function validateDoc(raw: unknown): Doc | null {
     const x = raw as Record<string, unknown>;
     if (!ID.test(id) || !x) continue;
     const rec = {
-      title: vReg(x.title, str(200)), notes: vReg(x.notes, str(5000)), due: vReg(x.due, optDue),
-      assignee: vReg(x.assignee, optName), place: vReg(x.place, place), alive: vReg(x.alive, bool),
+      title: vReg(x.title, str(200), 200), notes: vReg(x.notes, str(5000), 5000), due: vReg(x.due, optDue),
+      assignee: vReg(x.assignee, optName, 60), place: vReg(x.place, place), alive: vReg(x.alive, bool),
     };
     if (Object.values(rec).every(Boolean)) cards[id] = rec as CardRec;
   }
