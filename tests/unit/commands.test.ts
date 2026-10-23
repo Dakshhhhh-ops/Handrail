@@ -57,6 +57,16 @@ describe('parseCommand', () => {
     expect(parse('what are my tasks')).toEqual({ type: 'unknown', text: 'what are my tasks' });
     expect(parse('my tasks')).toEqual({ type: 'mine' });
   });
+
+  it('does not misread edits as deletes, completions or new cards', () => {
+    expect(parse('remove the due date from slides')).toMatchObject({ type: 'due', card: 'slides', due: null });
+    expect(parse('delete the deadline on slides')).toMatchObject({ type: 'due', card: 'slides', due: null });
+    expect(parse('finish slides by friday')).toMatchObject({ type: 'due', card: 'slides', due: '2026-10-23' });
+    expect(parse('make the intro shorter')).toEqual({ type: 'unknown', text: 'make the intro shorter' });
+    expect(parse('make a card called book a room')).toMatchObject({ type: 'add', title: 'book a room' });
+    expect(parse('remove slides')).toEqual({ type: 'delete', card: 'slides' });
+    expect(parse('finish slides')).toEqual({ type: 'done', card: 'slides' });
+  });
 });
 
 describe('matching', () => {

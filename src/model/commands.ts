@@ -134,7 +134,9 @@ export function parseCommand(raw: string, ctx: ParseContext): Command {
   m = orig.match(/^(?:add|create|make|new)\s+(?:a\s+)?(?:new\s+)?(?:column|list|lane)\s+(?:called\s+|named\s+)?(.+)$/i);
   if (m) return { type: 'addColumn', title: clean(m[1]) };
 
-  m = orig.match(/^(?:add|create|make|new|remind me to)\s+(?:a\s+)?(?:new\s+)?(?:card|task|item)?\s*(?:called\s+|named\s+|to\s+)?(.+)$/i);
+  // "make" only adds a card when it says so ("make a card called …"): "make the intro shorter" is an edit, not a new card.
+  m = orig.match(/^(?:add|create|new|remind me to)\s+(?:a\s+)?(?:new\s+)?(?:card|task|item)?\s*(?:called\s+|named\s+|to\s+)?(.+)$/i)
+    ?? orig.match(/^make\s+(?:a\s+)?(?:new\s+)?(?:card|task|item)\s+(?:called\s+|named\s+|to\s+)?(.+)$/i);
   if (m && !/^(note|notes)\b/i.test(m[1])) {
     const c = splitClauses(m[1], ctx);
     if (c.title) return { type: 'add', ...c };
@@ -168,6 +170,13 @@ export function parseCommand(raw: string, ctx: ParseContext): Command {
     if (split) return { type: 'move', card: split.card, column: split.column, position };
   }
 
+  // "finish the slides by friday" is a deadline, not "it's done".
+  m = orig.match(/^(?:finish|complete|do|submit|send)\s+(.+?)\s+(?:by|before)\s+(.+)$/i);
+  if (m) {
+    const due = parseDue(m[2], ctx.today);
+    if (due) return { type: 'due', card: clean(m[1]), due, dueText: m[2] };
+  }
+
   m = orig.match(/^mark\s+(.+?)\s+(?:as\s+)?(done|finished|complete|completed)$/i)
     ?? orig.match(/^(?:done with|done|finished|finish|complete|completed|tick off|check off|close)\s+(.+)$/i)
     ?? orig.match(/^(.+?)\s+is\s+(?:done|finished|complete|completed)$/i)
@@ -180,6 +189,10 @@ export function parseCommand(raw: string, ctx: ParseContext): Command {
   m = orig.match(/^(?:start|begin|start on|work on|working on|i'?m working on|i am working on)\s+(.+)$/i);
   if (m) return { type: 'start', card: clean(m[1]) };
 
+  // Checked before "remove X", so "remove the due date from X" never deletes the card.
+  m = orig.match(/^(?:clear|remove|delete|drop) (?:the )?(?:due date|deadline) (?:of|on|for|from)\s+(.+)$/i);
+  if (m) return { type: 'due', card: clean(m[1]), due: null, dueText: '' };
+
   m = orig.match(/^(?:delete|remove|trash|archive|get rid of)\s+(.+)$/i);
   if (m) return { type: 'delete', card: clean(m[1]) };
 
@@ -189,8 +202,6 @@ export function parseCommand(raw: string, ctx: ParseContext): Command {
   m = orig.match(/^(?:assign|give)\s+(.+?)\s+to\s+(.+)$/i);
   if (m) return { type: 'assign', card: clean(m[1]), person: clean(m[2]) };
 
-  m = orig.match(/^(?:clear|remove) (?:the )?due date (?:of|on|for|from)\s+(.+)$/i);
-  if (m) return { type: 'due', card: clean(m[1]), due: null, dueText: '' };
 
   m = orig.match(/^(?:set\s+)?(?:the\s+)?due date (?:of|on|for)\s+(.+?)\s+(?:to|as|is)\s+(.+)$/i)
     ?? orig.match(/^(?:set\s+)?(.+?)\s+(?:is\s+)?due\s+(.+)$/i);
