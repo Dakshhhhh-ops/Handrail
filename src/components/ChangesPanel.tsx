@@ -38,7 +38,7 @@ export function ChangesPanel({
 
   return (
     <section className={`changes${!acknowledged && changes.length ? ' has-news' : ''}`} aria-labelledby="changes-h" tabIndex={-1} id="changes" data-testid="changes" data-autofocus={!acknowledged && changes.length ? true : undefined}>
-      <h3 id="changes-h">Since you last looked</h3>
+      <h3 id="changes-h" tabIndex={-1}>Since you last looked</h3>
 
       {changes.length === 0 && (
         <p className="empty-note">

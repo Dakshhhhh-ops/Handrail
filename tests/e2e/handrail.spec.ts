@@ -210,7 +210,7 @@ test.describe('handoff between teammates', () => {
     // Priya opens Riya's link.
     await page.goto(back);
     const changes = page.getByTestId('changes');
-    await expect(changes).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Since you last looked' })).toBeFocused();
     await expect(changes.getByRole('listitem')).toHaveText([
       /For you: Riya assigned “Email Dr. Mehta about the extension” to you\./,
       /Riya moved “Design slides 4 to 8” from To do to Done\./,

@@ -277,9 +277,12 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
     const n = store.changes.length;
     if (n > 0) {
       const forYou = store.changes.filter((c) => c.forYou).length;
-      announce(`Opened the shared “${title}”. ${n} ${n === 1 ? 'change' : 'changes'} since you last looked${forYou ? `, ${forYou} for you` : ''}. The list is next.`);
+      // Focus moves to the short heading first; the summary follows, so a screen reader
+      // reads the summary instead of every item in the panel, and focus speech can't cut it off.
+      const said = `Opened the shared “${title}”. ${n} ${n === 1 ? 'change' : 'changes'} since you last looked${forYou ? `, ${forYou} for you` : ''}. ${summarize(store.changes, me, today)}`;
+      window.setTimeout(() => announce(said), 400);
       if (wide) {
-        focusLater('changes');
+        focusLater('changes-h');
         window.setTimeout(() => replayChanges(store.changes), 700);
       } else {
         lastFocus.current = null;
@@ -557,7 +560,7 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
           ? `Updated “${b.title}” from Trello. ${r.changes} ${r.changes === 1 ? 'change' : 'changes'} since your last import. Say “what changed” to hear them.`
           : `Updated “${b.title}” from Trello. Nothing changed since your last import.`);
         if (!r.changes) focusLater('board');
-        else if (wide) focusLater('changes');
+        else if (wide) focusLater('changes-h');
         else { lastFocus.current = null; setActivityOpen(true); }
         return;
       }
