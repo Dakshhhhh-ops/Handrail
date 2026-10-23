@@ -59,6 +59,8 @@
   justify-content: center;
   gap: 1rem;
   max-width: 36rem;
+  /* Keep content clear of the ruler fixed along the bottom. */
+  padding-bottom: 5.5rem;
 }
 .scene h2 {
   font-family: var(--display);
@@ -80,7 +82,8 @@
 .hero-title {
   font-family: var(--display);
   font-weight: 900;
-  font-size: clamp(3.6rem, 8.4vw, 8rem);
+  /* Scales with height too, so the hero fits above the ruler on shorter screens. */
+  font-size: clamp(3.2rem, min(8.4vw, 12.5vh), 8rem);
   line-height: 0.88;
   text-transform: uppercase;
   letter-spacing: 0.005em;
