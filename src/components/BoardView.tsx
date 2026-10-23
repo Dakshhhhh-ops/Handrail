@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { measureCards, playMoves, tilt, untilt, type Rects } from '../lib/motion';
 import { locate, moveCard } from '../model/board';
 import { describeDue } from '../model/dates';
 import { cardLabel, positionText, sameName } from '../model/describe';
@@ -119,6 +120,20 @@ export function BoardView({
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const pendingFocus = useRef<string | null>(null);
   const [cardFocused, setCardFocused] = useState(false);
+
+  // Cards glide from where they were whenever the arrangement changes (by keyboard, command, mouse or a teammate).
+  const boardRef = useRef<HTMLDivElement>(null);
+  const lastRects = useRef<Rects>(new Map());
+  const lastShape = useRef<string>('');
+  const shape = board.id + '|' + board.columns.map((c) => c.id + ':' + c.cardIds.filter((id) => !visible || visible(id)).join(',')).join('|');
+  useLayoutEffect(() => {
+    const now = measureCards(boardRef.current);
+    if (lastShape.current && lastShape.current !== shape && lastShape.current.split('|')[0] === board.id) {
+      playMoves(boardRef.current, lastRects.current, now);
+    }
+    lastRects.current = now;
+    lastShape.current = shape;
+  });
 
   const isShown = (id: string) => (visible ? visible(id) : true);
   const shownIn = (colIndex: number) => board.columns[colIndex].cardIds.filter(isShown);
@@ -369,6 +384,7 @@ export function BoardView({
     <>
     <div className={`board-wrap layout-${layout}`} onFocus={revealFocus}>
     <div
+      ref={boardRef}
       id="board"
       className={`board${grab ? ' is-grabbing' : ''}`}
       aria-label={`${board.title} board`}
@@ -453,6 +469,8 @@ export function BoardView({
                       onClick={() => (grabbed ? drop() : cb.openActions(id))}
                       onKeyDown={(e) => onCardKey(e, id)}
                       draggable
+                      onPointerMove={tilt}
+                      onPointerLeave={untilt}
                       onDragStart={(e) => onDragStart(e, id)}
                       onDragEnd={() => {
                         setDragId(null);

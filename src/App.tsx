@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addCard, addColumn, deleteCard, deleteColumn, locate, moveCard, moveColumn, peopleOn, renameBoard, renameColumn, updateCard,
 } from './model/board';
@@ -20,6 +20,9 @@ import { CommandBar } from './components/CommandBar';
 import { ChangesPanel } from './components/ChangesPanel';
 import { ActivityContent, LiveBar, NamePrompt, type HistoryEntry, type LiveStatus } from './components/ActivityPanel';
 import { createSession, newRoomCode, trysteroTransport, type LiveSession } from './lib/live';
+import { entrance, replay } from './lib/motion';
+import { personClass } from './components/BoardView';
+import type { Change } from './model/diff';
 import { Modal } from './components/Modal';
 import { useMediaQuery } from './lib/useMediaQuery';
 import { CheckIcon, ChevronDownIcon, GearIcon, HelpIcon, RedoIcon, ShareIcon, UndoIcon } from './components/Icons';
@@ -190,8 +193,10 @@ function Shell({ store }: { store: Handrail }) {
     if (n > 0) {
       const forYou = store.changes.filter((c) => c.forYou).length;
       announce(`Opened the shared “${title}”. ${n} ${n === 1 ? 'change' : 'changes'} since you last looked${forYou ? `, ${forYou} for you` : ''}. The list is next.`);
-      if (wide) focusLater('changes');
-      else {
+      if (wide) {
+        focusLater('changes');
+        window.setTimeout(() => replayChanges(store.changes), 700);
+      } else {
         lastFocus.current = null;
         setActivityOpen(true);
       }
@@ -253,10 +258,22 @@ function Shell({ store }: { store: Handrail }) {
     const { changes, seq } = store.liveArrivals;
     if (!seq || !changes.length) return;
     announce(summarize(changes, me, today));
-    const first = changes.find((c) => c.cardId)?.cardId;
-    if (first) setHighlightId(first);
+    replayChanges(changes);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.liveArrivals.seq]);
+
+  /** Name-tagged cursors fly from Activity to each card a teammate changed (or the cards flash, with motion off). */
+  function replayChanges(list: Change[]) {
+    const seen = new Set<string>();
+    const steps = list
+      .filter((c) => c.cardId && !seen.has(c.cardId) && seen.add(c.cardId))
+      .map((c) => ({ cardId: c.cardId!, who: c.by ?? 'Someone', colour: personClass(c.by) }));
+    void replay(steps);
+  }
+
+  useEffect(() => {
+    entrance(document.querySelector<HTMLElement>('main'));
+  }, []);
 
   // ---- Undo / redo -----------------------------------------------------------
   const undo = useCallback((): string => {
@@ -516,6 +533,7 @@ function Shell({ store }: { store: Handrail }) {
       }}
       digest={summarize(justMine ? store.changes.filter((c) => c.forYou) : store.changes, me, today)}
       onReadAll={() => announce(readChanges())}
+      onReplay={() => replayChanges(justMine ? store.changes.filter((c) => c.forYou) : store.changes)}
       onDone={() => {
         store.markSeen();
         announce('Marked as seen. The changes stay collapsed in Activity until new ones arrive.');
@@ -572,7 +590,16 @@ function Shell({ store }: { store: Handrail }) {
         <div className="board-head">
           <h1>
             <button type="button" id="board-switcher" className="board-name" onClick={() => openDialog('boards')} aria-haspopup="dialog" aria-describedby="board-switcher-hint">
-              {board.title}
+              <span className="title-words">
+                {board.title.split(/\s+/).map((w, i) => (
+                  <Fragment key={i}>
+                    {i > 0 && ' '}
+                    <span className="title-word-wrap">
+                      <span className="title-word">{w}</span>
+                    </span>
+                  </Fragment>
+                ))}
+              </span>
               <ChevronDownIcon size={20} />
             </button>
           </h1>

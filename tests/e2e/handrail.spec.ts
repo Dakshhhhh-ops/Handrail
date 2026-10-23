@@ -482,6 +482,10 @@ test('settings persist after reload', async ({ page }) => {
 
 test.describe('automated accessibility audit (axe, WCAG 2.2 AA)', () => {
   const audit = async (page: Page) => {
+    // Check the settled page: wait for one-off animations (fades, pops) to finish. Looping ones are decorative.
+    await page.waitForFunction(() =>
+      document.getAnimations().every((an) => an.playState !== 'running' || an.effect?.getTiming().iterations === Infinity),
+    );
     const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze();
     expect(r.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
   };

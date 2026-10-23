@@ -204,8 +204,10 @@ q { quotes: '“' '”'; }
 :root[data-theme='light'] :is(.activity, .dock, .modal-full) :is(input, textarea, select):focus-visible { outline-color: #4fb3ff; }
 @media (prefers-color-scheme: light) { :root[data-theme='system'] :is(.activity, .dock, .modal-full) :is(input, textarea, select):focus-visible { outline-color: #4fb3ff; } }
 :root[data-theme='contrast'] :is(.activity, .dock, .modal-full) :is(input, textarea, select):focus-visible { outline-color: #ff7bff; }
-/* A dialog only holds focus for a moment while it opens; its controls show their own rings. */
-dialog:focus-visible { outline: none; }
+/* Tab can rest on the dialog itself: show a ring inside its edge (6:1 on paper, 7:1 on night). */
+dialog:focus-visible { outline: 3px solid var(--focus-paper); outline-offset: -6px; }
+dialog.modal-full:focus-visible { outline-color: var(--sky); }
+:root[data-theme='contrast'] dialog:focus-visible { outline-color: #ff7bff; }
 .skip-link:focus-visible { outline-color: #4fb3ff; }
 /* Capitals are harder to read with dyslexia; drop them when the reader chose a reading font or spacing. */
 :root:is([data-font='opendyslexic'], [data-font='system'], [data-spacing='relaxed']) * { text-transform: none !important; }
@@ -453,8 +455,10 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
   cursor: pointer;
   position: relative;
   --focus: var(--sky); /* the ring sits outside the card, on the canvas */
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translate(var(--lift, 0px), var(--lift, 0px));
+  transform-style: preserve-3d;
 }
-.card:hover { transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--frame); }
+.card:hover { --lift: -2px; box-shadow: 6px 6px 0 var(--frame); }
 :root[data-theme='contrast'] .card:hover { transform: none; }
 .card.is-dragging { cursor: grabbing; opacity: 0.45; }
 .card.is-overdue { box-shadow: inset 5px 0 0 var(--overdue-fg), var(--hard); padding-left: 1.2rem; }
@@ -826,3 +830,64 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 :root[data-compact] .toolbar .btn { flex: none; min-width: 44px; padding-inline: 0.5rem; }
 :root[data-compact] .toolbar .btn-label,
 :root[data-compact] .status-pill { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---- Title words rise in (they sit inside a clipping line) ---------------------------- */
+.title-words { display: inline; }
+.title-word-wrap { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: 0.05em; }
+.title-word { display: inline-block; }
+
+/* ---- Multiplayer cursors that fly to changed cards (decorative, aria-hidden) ------------- */
+.cursor-layer { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+.fly-cursor { position: absolute; top: 0; left: 0; display: flex; align-items: flex-start; gap: 2px; color: var(--pc, var(--butter)); filter: drop-shadow(2px 3px 0 #0c0c16); will-change: transform; }
+.fly-cursor span { margin-top: 18px; padding: 0.1rem 0.5rem; border-radius: 6px 6px 6px 0; background: var(--pc, var(--butter)); color: #17162b; border: 1.5px solid #17162b; font: 800 0.8rem var(--font); white-space: nowrap; }
+
+/* ---- Motion (only when nobody asked for less) -------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion='reduce']) .modal[open] { animation: pop-in 0.38s cubic-bezier(.2, .9, .3, 1.25); }
+  :root:not([data-motion='reduce']) .modal-full[open] { animation: rise-in 0.35s cubic-bezier(.2, .85, .25, 1); }
+  :root:not([data-motion='reduce']) .modal[open]::backdrop { animation: fade-in 0.3s ease-out; }
+  :root:not([data-motion='reduce']) .msg { animation: slide-in 0.35s cubic-bezier(.2, .85, .25, 1); }
+  :root:not([data-motion='reduce']) .news-num { animation: sticker 0.7s cubic-bezier(.2, .9, .3, 1.4); }
+  :root:not([data-motion='reduce']) .change-list li { animation: slide-in 0.45s cubic-bezier(.2, .85, .25, 1) backwards; }
+  :root:not([data-motion='reduce']) .change-list li:nth-child(2) { animation-delay: 0.06s; }
+  :root:not([data-motion='reduce']) .change-list li:nth-child(3) { animation-delay: 0.12s; }
+  :root:not([data-motion='reduce']) .change-list li:nth-child(4) { animation-delay: 0.18s; }
+  :root:not([data-motion='reduce']) .change-list li:nth-child(n+5) { animation-delay: 0.24s; }
+  :root:not([data-motion='reduce']) .change-flag { animation: tag-in 0.5s cubic-bezier(.2, .9, .3, 1.4) backwards 0.3s; }
+  :root:not([data-motion='reduce']) .btn-primary:hover:not(:disabled) .icon { animation: wiggle 0.4s ease-in-out; }
+  :root:not([data-motion='reduce']) .card:hover { background-image: radial-gradient(circle at var(--mx, 50%) var(--my, 0%), rgb(255 211 92 / 0.28), transparent 60%); }
+  :root:not([data-motion='reduce']) .card { transition: transform 0.18s ease-out, box-shadow 0.18s, background-color 0.15s; }
+  :root:not([data-motion='reduce']) .layout::before { animation: twinkle 7s ease-in-out infinite alternate; }
+  :root:not([data-motion='reduce']) .status-pill .dot { animation: pulse 2.4s ease-in-out infinite; }
+}
+@keyframes pop-in { from { opacity: 0; transform: translateY(18px) scale(0.94) rotate(-1deg); } }
+@keyframes rise-in { from { transform: translateY(100%); } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes slide-in { from { opacity: 0; transform: translateY(10px); } }
+@keyframes sticker { 0% { transform: scale(0.3) rotate(-25deg); } 60% { transform: scale(1.15) rotate(6deg); } 100% { transform: none; } }
+@keyframes tag-in { from { opacity: 0; transform: translateY(8px) scale(0.7); } }
+@keyframes wiggle { 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
+@keyframes twinkle { from { opacity: 0.35; } to { opacity: 0.9; } }
+
+/* Faint stars on the canvas (decorative). */
+.layout { position: relative; }
+.layout::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.6;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 18%, rgb(255 255 255 / 0.7), transparent 60%),
+    radial-gradient(1.5px 1.5px at 38% 72%, rgb(255 255 255 / 0.6), transparent 60%),
+    radial-gradient(2px 2px at 64% 12%, rgb(255 255 255 / 0.55), transparent 60%),
+    radial-gradient(1.5px 1.5px at 82% 58%, rgb(255 255 255 / 0.6), transparent 60%),
+    radial-gradient(1.5px 1.5px at 22% 88%, rgb(255 255 255 / 0.5), transparent 60%),
+    radial-gradient(2px 2px at 92% 28%, rgb(255 255 255 / 0.5), transparent 60%),
+    radial-gradient(1.5px 1.5px at 52% 42%, rgb(255 255 255 / 0.45), transparent 60%);
+  background-size: 420px 420px;
+}
+:root[data-theme='light'] .layout::before, :root[data-theme='contrast'] .layout::before { display: none; }
+@media (prefers-color-scheme: light) { :root[data-theme='system'] .layout::before { display: none; } }
+.main-col, .activity { position: relative; z-index: 1; }
+.activity { position: sticky; }
