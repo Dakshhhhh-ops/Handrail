@@ -83,6 +83,26 @@ describe('per-action undo', () => {
     expect(revertEdit(added, before, added, 'Priya').board.cards[cardId]).toBeUndefined();
   });
 
+  it('undoing a delete keeps a teammate’s edit made to the card after it was deleted', () => {
+    const start = docFromBoard(demoBoard(today), 'priya', 'Priya', 1);
+    const before = materialize(start);
+    const after = deleteCard(before, 'k-email');
+    const priya = commit(start, after, 'priya', 'Priya', 2);
+    // Riya hadn't seen the delete, and renamed the card.
+    const riya = commit(start, updateCard(before, 'k-email', { title: 'Email Dr. Mehta today' }, 'Riya'), 'riya', 'Riya', 3);
+    const merged = mergeDocs(priya, riya);
+    const latest = (id: string) => {
+      const r = merged.cards[id];
+      return r && { title: r.title.v, notes: r.notes.v, due: r.due.v, assignee: r.assignee.v };
+    };
+    const undone = revertEdit(materialize(merged), before, after, 'Priya', latest).board;
+    expect(undone.cards['k-email'].title).toBe('Email Dr. Mehta today');
+    expect(where(undone, 'k-email')).toBe('To do:2');
+    // Committing the undo doesn't overwrite Riya's title with the old one.
+    const back = commit(merged, undone, 'priya', 'Priya', 4);
+    expect(back.cards['k-email'].title.by).toBe('Riya');
+  });
+
   it('only reverts the fields the action changed', () => {
     const before = demoBoard(today);
     const after = updateCard(before, 'k-slides', { due: '2026-11-01' }, 'Priya');

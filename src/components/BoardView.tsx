@@ -121,6 +121,7 @@ export function BoardView({
   const [grab, setGrab] = useState<Grab | null>(null);
   // The key hint is read with the first card you land on, not repeated on every card.
   const [hintHeard, setHintHeard] = useState(false);
+  const deleteArmed = useRef<{ id: string; at: number } | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const pendingFocus = useRef<string | null>(null);
@@ -187,7 +188,18 @@ export function BoardView({
 
   function cancelGrab() {
     if (!grab) return;
-    cb.replace(grab.origin);
+    // Put back only the carried card. Restoring the whole board as it was at pick-up
+    // would also undo anything a teammate changed in the meantime.
+    const from = locate(grab.origin, grab.cardId);
+    const card = board.cards[grab.cardId];
+    const home = from && board.columns.find((c) => c.id === from.column.id);
+    if (card && home) {
+      const columns = board.columns.map((c) => ({ ...c, cardIds: c.cardIds.filter((id) => id !== grab.cardId) }));
+      const target = columns.find((c) => c.id === home.id)!;
+      target.cardIds.splice(Math.min(from.index, target.cardIds.length), 0, grab.cardId);
+      const was = grab.origin.cards[grab.cardId];
+      cb.replace({ ...board, columns, cards: { ...board.cards, [grab.cardId]: { ...card, lastEditedBy: was.lastEditedBy, updatedAt: was.updatedAt } } });
+    }
     const loc = locate(grab.origin, grab.cardId);
     setGrab(null);
     pendingFocus.current = grab.cardId;
@@ -355,10 +367,19 @@ export function BoardView({
         cb.openEditor(null, loc.column.id);
         return;
       case 'Delete':
-      case 'Backspace':
+      case 'Backspace': {
         handled();
-        cb.deleteCard(cardId);
+        // One stray key press shouldn't delete a card: ask for a second press.
+        const armed = deleteArmed.current;
+        if (armed && armed.id === cardId && Date.now() - armed.at < 4000) {
+          deleteArmed.current = null;
+          cb.deleteCard(cardId);
+        } else {
+          deleteArmed.current = { id: cardId, at: Date.now() };
+          announce(`Press ${e.key} again to delete “${card.title}”.`);
+        }
         return;
+      }
       default:
         if (/^[1-9]$/.test(e.key) && !e.altKey) {
           handled();
@@ -405,7 +426,9 @@ export function BoardView({
       id="board"
       className={`board${grab ? ' is-grabbing' : ''}`}
       aria-label={`${board.title} board`}
-      role="region"
+      // A custom keyboard widget: screen readers switch to focus mode inside it, so arrows,
+      // Space and number keys reach the board instead of being kept by browse mode.
+      role="application"
       tabIndex={-1}
     >
       <p id="card-hint" className="sr-only">

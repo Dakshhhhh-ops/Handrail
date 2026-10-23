@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addCard } from '../../src/model/board';
+import { addCard, locate, moveCard } from '../../src/model/board';
 import { commit } from '../../src/model/crdt';
 import { importTrello, trelloAuthors, TRELLO_SOMEONE } from '../../src/model/importers';
 import { DEFAULT_SETTINGS, importFromTrello, view, type Saved } from '../../src/store/useHandrail';
@@ -97,6 +97,29 @@ describe('Trello re-import', () => {
     expect(titles).toContain('Book a lab slot');
     expect(titles).toContain('Abstract');
     expect(titles).not.toContain('Poster');
+  });
+
+  it('a card Priya moved stays put when Trello adds a card above it, with no false conflict', () => {
+    const first = load(emptySaved(), firstExport);
+    const s = first.saved;
+    const board = view(s.docs['t-B1']);
+    const moved = moveCard(board, 'tc-c2', 'tl-L3', 0, 'Priya');
+    const doc = commit(s.docs['t-B1'], moved, s.actor, 'Priya');
+    const edited: Saved = { ...s, docs: { ...s.docs, 't-B1': doc }, seen: { ...s.seen, 't-B1': view(doc) } };
+    // In Trello, someone adds a card at the top of To Do; c2 is unchanged there.
+    const later = { ...firstExport, cards: [{ id: 'c0', name: 'Read the brief', idList: 'L1', pos: 0 }, ...firstExport.cards] };
+    const r = load(edited, later);
+    const after = view(r.saved.docs['t-B1']);
+    expect(locate(after, 'tc-c2')?.column.title).toBe('Done');
+    expect(r.fresh.map((c) => c.text)).toEqual(['Someone in Trello added “Read the brief” to To Do.']);
+  });
+
+  it('reads Trello due times as dates in the local time zone', () => {
+    const due = '2026-10-30T23:30:00.000Z';
+    const b = importTrello({ ...firstExport, cards: [{ id: 'c1', name: 'Write method', idList: 'L1', pos: 1, due }] })!;
+    const t = new Date(due);
+    const local = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    expect(b.cards['tc-c1'].due).toBe(local);
   });
 
   it('Trello wins when the same card was changed in both places', () => {

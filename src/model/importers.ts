@@ -20,7 +20,7 @@ export function importTrello(raw: unknown): Board | null {
   }
 
   type L = { id: string; name: string; pos: number; closed?: boolean };
-  type C = { id: string; name: string; desc?: string; due?: string | null; idList: string; pos: number; closed?: boolean; idMembers?: string[] };
+  type C = { id: string; name: string; desc?: string; due?: string | null; idList: string; pos: number; closed?: boolean; idMembers?: string[]; dateLastActivity?: string };
   const lists = (r.lists as L[]).filter((l) => l && !l.closed && typeof l.id === 'string').sort((a, b) => a.pos - b.pos);
   const cards = (r.cards as C[]).filter((c) => c && !c.closed && typeof c.name === 'string').sort((a, b) => a.pos - b.pos);
 
@@ -37,16 +37,26 @@ export function importTrello(raw: unknown): Board | null {
     if (!col) continue;
     const id = trelloId('tc', c.id);
     if (board.cards[id]) continue;
-    const due = typeof c.due === 'string' ? c.due.slice(0, 10) : null;
+    const due = typeof c.due === 'string' ? localDate(c.due) : null;
     const assignee = (c.idMembers ?? []).map((m) => members.get(m)).find(Boolean) ?? null;
+    // Trello's own activity time, not the import time: a card only counts as moved on a
+    // re-import if it really changed in Trello, so cards Priya moved here stay put.
+    const touched = typeof c.dateLastActivity === 'string' ? Date.parse(c.dateLastActivity) : NaN;
     board.cards[id] = {
       id, title: c.name, notes: c.desc ?? '', due: due && isISODate(due) ? due : null,
-      assignee, lastEditedBy: null, updatedAt: Date.now(),
+      assignee, lastEditedBy: null, updatedAt: Number.isFinite(touched) ? touched : 0,
     };
     col.cardIds.push(id);
   }
   if (board.columns.length === 0) return null;
   return validateBoard(board);
+}
+
+/** The calendar day of a Trello due time, in this device's time zone (Trello stores UTC). */
+function localDate(iso: string): string | null {
+  const t = new Date(iso);
+  if (Number.isNaN(t.getTime())) return null;
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
 }
 
 /** Handrail ids for Trello's ids (24 hex characters), or a fresh id for anything odd. */

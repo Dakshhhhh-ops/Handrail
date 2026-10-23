@@ -36,7 +36,11 @@ function insertCard(board: Board, card: Card, columnId: string, index: number): 
   };
 }
 
-export function revertEdit(current: Board, before: Board, after: Board, by: string | null): RevertResult {
+export function revertEdit(
+  current: Board, before: Board, after: Board, by: string | null,
+  /** The newest known fields of a deleted card (teammates may have edited it after it was deleted here). */
+  latest?: (cardId: string) => Partial<Pick<Card, (typeof FIELDS)[number]>> | undefined,
+): RevertResult {
   let b = current;
   let skipped = 0;
 
@@ -80,7 +84,7 @@ export function revertEdit(current: Board, before: Board, after: Board, by: stri
   for (const [id, card] of Object.entries(before.cards)) {
     if (after.cards[id] || b.cards[id]) continue;
     const loc = locate(before, id);
-    if (loc) b = insertCard(b, { ...card, lastEditedBy: by, updatedAt: Date.now() }, loc.column.id, loc.index);
+    if (loc) b = insertCard(b, { ...card, ...latest?.(id), lastEditedBy: by, updatedAt: Date.now() }, loc.column.id, loc.index);
   }
 
   // Cards the action edited or moved.

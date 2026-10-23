@@ -143,8 +143,11 @@ test.describe('keyboard only', () => {
     await expect(cardIn(page, 'Done', 'Find five sources')).toBeFocused();
   });
 
-  test('Delete removes a card and Ctrl+Z brings it back', async ({ page }) => {
+  test('Delete asks for a second press, removes the card, and Ctrl+Z brings it back', async ({ page }) => {
     await cardIn(page, 'Done', 'Set up the group chat').focus();
+    await page.keyboard.press('Delete');
+    await expect(live(page)).toContainText('Press Delete again to delete “Set up the group chat”');
+    await expect(cardIn(page, 'Done', 'Set up the group chat')).toBeVisible();
     await page.keyboard.press('Delete');
     await expect(live(page)).toContainText('Deleted “Set up the group chat”');
     await expect(page.locator('[data-card]', { hasText: 'Set up the group chat' })).toHaveCount(0);
@@ -366,6 +369,8 @@ test.describe('activity panel', () => {
     await page.reload();
     await expect(live(page)).toContainText('4 changes are waiting since you last looked');
     await expect(page).toHaveTitle(/^\(4\) Climate talk/);
+    // The summary keeps its details after a reload.
+    await expect(page.getByTestId('digest')).toContainText('Riya gave you “Email Dr. Mehta about the extension”');
   });
 
   test('cards teammates changed are marked on the board until you press Got it', async ({ page }) => {

@@ -168,6 +168,9 @@ export function loadSaved(): Saved {
           kind: c.kind, text: c.text.slice(0, 500), forYou: !!c.forYou,
           cardId: typeof c.cardId === 'string' ? c.cardId : undefined,
           by: typeof c.by === 'string' ? c.by.slice(0, 60) : null,
+          // Kept so the grouped summary still reads in full after a reload.
+          title: typeof c.title === 'string' ? c.title.slice(0, 200) : undefined,
+          to: typeof c.to === 'string' ? c.to.slice(0, 200) : null,
         }));
     }
     const before: Record<string, Board> = {};
@@ -300,11 +303,25 @@ export function importFromTrello(saved: Saved, board: Board, byCard: Record<stri
     const next = created(saved, board, doc);
     return { saved: { ...next, trello: { ...(next.trello ?? {}), [doc.id]: doc } }, fresh: [], updated: false };
   }
+  // A card only counts as moved if its place among the other cards changed in Trello.
+  // (Commit treats a card with a new timestamp and a new index as moved, and an import
+  // stamps every card, so a card added above would otherwise drag the ones below along.)
+  const was = view(last);
+  const steady: Board = {
+    ...board,
+    cards: Object.fromEntries(Object.entries(board.cards).map(([id, c]) => [id, was.cards[id] ? { ...c, updatedAt: was.cards[id].updatedAt } : c])),
+  };
   // Trello's export is newer than anything already here, so its writes are ordered after them.
-  const theirs = commit({ ...last, clock: Math.max(last.clock, local.clock) }, board, TRELLO_ACTOR, by, Date.now(), byCard);
+  const theirs = commit({ ...last, clock: Math.max(last.clock, local.clock) }, steady, TRELLO_ACTOR, by, Date.now(), byCard);
   const { saved: next, fresh } = receive(saved, theirs);
   return { saved: { ...next, trello: { ...(next.trello ?? {}), [board.id]: theirs } }, fresh, updated: true };
 }
+
+/** A deleted card's newest field values, so bringing it back keeps teammates' later edits. */
+const latestOf = (doc: Doc) => (cardId: string) => {
+  const r = doc.cards[cardId];
+  return r ? { title: r.title.v, notes: r.notes.v, due: r.due.v, assignee: r.assignee.v } : undefined;
+};
 
 function reducer(state: State, action: Action): State {
   const { saved } = state;
@@ -331,7 +348,7 @@ function reducer(state: State, action: Action): State {
       if (!prev) return state;
       // Put back only what that action changed, leaving teammates' later edits alone.
       // It is a new edit, so it syncs like any other change.
-      const { board } = revertEdit(current, prev.before, prev.after, nameOf(saved));
+      const { board } = revertEdit(current, prev.before, prev.after, nameOf(saved), latestOf(saved.docs[saved.currentId]));
       return {
         ...state,
         saved: write(saved, board, true),
@@ -342,7 +359,7 @@ function reducer(state: State, action: Action): State {
     case 'redo': {
       const next = state.future[0];
       if (!next) return state;
-      const { board } = revertEdit(current, next.after, next.before, nameOf(saved));
+      const { board } = revertEdit(current, next.after, next.before, nameOf(saved), latestOf(saved.docs[saved.currentId]));
       return {
         ...state,
         saved: write(saved, board, true),
