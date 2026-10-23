@@ -561,6 +561,8 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .inline-form { flex-direction: row; flex-wrap: wrap; align-items: flex-end; }
 .inline-form .field { flex: 1 1 180px; }
 
+.crash { max-width: 40rem; margin: 15vh auto; padding: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.crash p { margin: 0; }
 .footer { padding: 1rem; text-align: center; color: var(--muted); border-top: 1px solid var(--border); }
 .footer p { margin: 0; }
 

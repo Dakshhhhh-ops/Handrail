@@ -11,6 +11,7 @@
  */
 import { validateDoc, type Doc, type VersionVector } from '../model/crdt';
 import LZString from 'lz-string';
+import { decompressFromUTF16 } from './lz';
 
 export interface Transport {
   /** Sends to everyone, or to one peer. */
@@ -42,7 +43,7 @@ export function covers(a: VersionVector, b: VersionVector): boolean {
 export const packDoc = (doc: Doc) => LZString.compressToUTF16(JSON.stringify(doc));
 export function unpackDoc(data: string): Doc | null {
   try {
-    const json = LZString.decompressFromUTF16(data);
+    const json = decompressFromUTF16(data);
     return json ? validateDoc(JSON.parse(json)) : null;
   } catch {
     return null;
@@ -57,11 +58,21 @@ export interface LiveSession {
   leave(): void;
 }
 
-export function createSession(transport: Transport, name: string | null, cb: LiveCallbacks): LiveSession {
+export function createSession(transport: Transport, name: string | null, cb: LiveCallbacks, actor: string, delayMs = 0): LiveSession {
   const peers = new Map<string, LivePeer>();
   let myName = name;
-  let known: VersionVector = { ...cb.getDoc().vv };
+  // Only my own edits are published; how far I've published is my own counter, which peers can't forge.
+  let sentMine = cb.getDoc().vv[actor] ?? 0;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let pending: Doc | null = null;
   const emit = () => cb.onPeers([...peers.values()]);
+  const flush = () => {
+    timer = null;
+    if (!pending) return;
+    const doc = pending;
+    pending = null;
+    if (peers.size) transport.send('doc', packDoc(doc));
+  };
 
   transport.onJoin((id) => {
     peers.set(id, peers.get(id) ?? { id, name: null });
@@ -86,33 +97,33 @@ export function createSession(transport: Transport, name: string | null, cb: Liv
       emit();
       return;
     }
-    if (data.length > 2_000_000) return;
     const doc = unpackDoc(data);
     if (!doc || doc.id !== cb.getDoc().id) return;
-    if (covers(known, doc.vv)) return; // nothing new: never echo
-    known = mergeVV(known, doc.vv);
+    // Nothing my board doesn't already have (judged by my own copy, not the peer's claims): ignore it.
+    if (covers(cb.getDoc().vv, doc.vv)) return;
     cb.onDoc(doc, peer);
   });
 
   return {
     publish(doc) {
-      if (covers(known, doc.vv)) return;
-      known = mergeVV(known, doc.vv);
-      if (peers.size) transport.send('doc', packDoc(doc));
+      const mine = doc.vv[actor] ?? 0;
+      if (mine <= sentMine) return; // merged copies that add nothing of mine are never echoed
+      sentMine = mine;
+      pending = doc;
+      if (delayMs <= 0) flush();
+      else if (!timer) timer = setTimeout(flush, delayMs);
     },
     setName(n) {
       myName = n;
       transport.send('hello', JSON.stringify({ name: n }));
     },
     peers: () => [...peers.values()],
-    leave: () => transport.leave(),
+    leave: () => {
+      if (timer) clearTimeout(timer);
+      flush();
+      transport.leave();
+    },
   };
-}
-
-function mergeVV(a: VersionVector, b: VersionVector): VersionVector {
-  const out = { ...a };
-  for (const [k, v] of Object.entries(b)) out[k] = Math.max(out[k] ?? 0, v);
-  return out;
 }
 
 /** Real network transport: Trystero over Nostr relays, loaded only when a session starts. */

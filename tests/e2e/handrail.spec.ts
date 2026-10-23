@@ -230,6 +230,17 @@ test.describe('handoff between teammates', () => {
     await expect(page.getByTestId('changes').locator('.news-count')).toHaveText(/^4\s*changes · 1 for you$/);
   });
 
+  test('hostile links are refused and the page keeps working', async ({ page }) => {
+    // (Decompression bombs are covered by tests/unit/lz.test.ts.)
+    const evil = encodeURIComponent('{"kind":"handrail-doc","v":2,"id":"constructor"}');
+    for (const hash of [`#board=v2.${evil}`, '#board=v2.' + 'A'.repeat(400_000)]) {
+      await page.goto(`/${hash}`);
+      await expect(live(page)).toContainText('That share link is broken or incomplete');
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+      expect(await page.evaluate(() => window.location.hash)).toBe('');
+    }
+  });
+
   test('a broken link is explained', async ({ page }) => {
     await page.goto('/#board=v1.garbage');
     await expect(live(page)).toContainText('That share link is broken or incomplete');

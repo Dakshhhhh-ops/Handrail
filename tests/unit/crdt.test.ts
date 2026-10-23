@@ -2,7 +2,7 @@ import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { addCard, addColumn, deleteCard, deleteColumn, moveCard, renameColumn, updateCard } from '../../src/model/board';
 import {
-  assignKeys, commit, docFromBoard, findConflicts, lisIndices, materialize, mergeDocs, validateDoc, type Doc,
+  assignKeys, commit, docFromBoard, findConflicts, lisIndices, materialize, mergeDocs, plausible, validateDoc, type Doc,
 } from '../../src/model/crdt';
 import { demoBoard } from '../../src/model/seed';
 import type { Board } from '../../src/model/types';
@@ -244,6 +244,60 @@ describe('validateDoc', () => {
     expect(v.cards['k-email']).toBeUndefined();
     expect(v.cards['../evil']).toBeUndefined();
     expect(v.clock).toBe(doc.clock);
+  });
+
+  it('rejects ids that collide with built-in object names', () => {
+    const doc = docFromBoard(demoBoard(today), 'priya', 'Priya');
+    for (const evil of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) {
+      const raw = JSON.parse(JSON.stringify(doc));
+      raw.cards[evil] = raw.cards['k-topic'];
+      raw.cols[evil] = raw.cols['c-done'];
+      const v = validateDoc(raw)!;
+      expect(Object.prototype.hasOwnProperty.call(v.cards, evil)).toBe(false);
+      expect(() => mergeDocs(v, doc)).not.toThrow();
+      expect(validateDoc({ ...raw, id: evil })).toBeNull();
+    }
+    const proto = JSON.parse('{"kind":"handrail-doc","v":2,"id":"b1","title":{"v":"x","c":1,"t":1,"a":"p","by":null},"cards":{"__proto__":{"polluted":true}},"cols":{},"clock":1,"vv":{}}');
+    expect(Object.getPrototypeOf(validateDoc(proto)!.cards)).toBe(Object.prototype);
+  });
+
+  it('derives the clock and version vector from the writes, ignoring forged values', () => {
+    const doc = docFromBoard(demoBoard(today), 'priya', 'Priya');
+    const raw = JSON.parse(JSON.stringify(doc));
+    raw.clock = 1e15;
+    raw.vv = { priya: 1e15, riya: 999 };
+    const v = validateDoc(raw)!;
+    expect(v.clock).toBe(doc.clock);
+    expect(v.vv).toEqual({ priya: doc.clock, riya: doc.clock });
+  });
+
+  it('refuses far-future clocks and times', () => {
+    const doc = docFromBoard(demoBoard(today), 'priya', 'Priya');
+    const raw = JSON.parse(JSON.stringify(doc));
+    raw.cards['k-topic'].title.c = 2 ** 50;
+    raw.cards['k-slides'].title.t = Date.now() + 10 * 86_400_000;
+    const v = validateDoc(raw)!;
+    expect(v.cards['k-topic']).toBeUndefined();
+    expect(v.cards['k-slides']).toBeUndefined();
+    const jump = commit(doc, updateCard(materialize(doc), 'k-email', { title: 'x' }, 'Eve'), 'eve', 'Eve');
+    expect(plausible(doc, { ...jump, clock: doc.clock + 2_000_000 })).toBe(false);
+    expect(plausible(doc, jump)).toBe(true);
+  });
+
+  it('settles exact ties (same device, same moment) by value, the same way everywhere', () => {
+    const base = docFromBoard(demoBoard(today), 'seed', null, 1);
+    const a = commit(base, updateCard(materialize(base), 'k-topic', { title: 'Tab A' }, 'P'), 'priya', 'P', 5);
+    const b = commit(base, updateCard(materialize(base), 'k-topic', { title: 'Tab B' }, 'P'), 'priya', 'P', 5);
+    expect(materialize(mergeDocs(a, b)).cards['k-topic'].title).toBe(materialize(mergeDocs(b, a)).cards['k-topic'].title);
+  });
+
+  it('shows the last column if concurrent deletes removed them all', () => {
+    const base = docFromBoard(demoBoard(today), 'seed', null, 1);
+    const one = commit(base, deleteColumn(deleteColumn(materialize(base), 'c-todo'), 'c-doing'), 'priya', 'P', 2);
+    const two = commit(base, deleteColumn(materialize(base), 'c-done'), 'riya', 'R', 3);
+    const merged = materialize(mergeDocs(one, two));
+    expect(merged.columns).toHaveLength(1);
+    expect(Object.keys(merged.cards)).toHaveLength(7);
   });
 
   it('rejects non-documents', () => {

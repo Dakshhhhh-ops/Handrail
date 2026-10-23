@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
-import { commit, docFromBoard, findConflicts, materialize, mergeDocs, validateDoc, type Doc } from '../model/crdt';
+import { commit, docFromBoard, findConflicts, materialize, mergeDocs, plausible, validateDoc, type Doc } from '../model/crdt';
 import { describeConflicts, diffBoards, type Change } from '../model/diff';
 import { newId } from '../model/board';
 import { demoBoard, demoTeammateEdits } from '../model/seed';
@@ -98,7 +98,12 @@ function freshSaved(): Saved {
   const actor = newId('d');
   // Opened from a teammate's link on a new device: start with just their board, and no
   // name yet (the app asks), instead of a sample board that would then be merged in.
-  const shared = typeof window !== 'undefined' ? docFromHash(window.location.hash) : null;
+  let shared: Doc | null = null;
+  try {
+    shared = typeof window !== 'undefined' ? docFromHash(window.location.hash) : null;
+  } catch {
+    shared = null;
+  }
   if (shared) {
     return {
       actor, docs: { [shared.id]: shared }, currentId: shared.id, seen: { [shared.id]: view(shared) },
@@ -122,7 +127,7 @@ export function loadSaved(): Saved {
     const raw = localStorage.getItem(KEY);
     if (!raw) return freshSaved();
     const parsed = JSON.parse(raw) as Partial<Saved> & { boards?: Record<string, unknown> };
-    const settings = { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) };
+    const settings = cleanSettings(parsed.settings);
     const actor = typeof parsed.actor === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(parsed.actor) ? parsed.actor : newId('d');
 
     const docs: Record<string, Doc> = {};
@@ -165,8 +170,32 @@ export function loadSaved(): Saved {
       settings,
     };
   } catch {
+    // Keep whatever was there before starting over, so nothing is silently lost.
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) localStorage.setItem(`${KEY}:backup:${Date.now()}`, raw);
+    } catch {
+      /* ignore */
+    }
     return freshSaved();
   }
+}
+
+/** Settings from storage, field by field, so one bad value can't reset everything. */
+function cleanSettings(raw: unknown): Settings {
+  const s = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const one = <T,>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? (v as T) : d);
+  return {
+    name: typeof s.name === 'string' ? s.name.slice(0, 60) : DEFAULT_SETTINGS.name,
+    theme: one(s.theme, ['system', 'light', 'dark', 'contrast'] as const, DEFAULT_SETTINGS.theme),
+    textSize: one(s.textSize, [100, 125, 150, 175, 200] as const, DEFAULT_SETTINGS.textSize),
+    font: one(s.font, ['system', 'atkinson', 'opendyslexic'] as const, DEFAULT_SETTINGS.font),
+    spacing: one(s.spacing, ['normal', 'relaxed'] as const, DEFAULT_SETTINGS.spacing),
+    layout: one(s.layout, ['columns', 'stacked'] as const, DEFAULT_SETTINGS.layout),
+    speak: typeof s.speak === 'boolean' ? s.speak : DEFAULT_SETTINGS.speak,
+    speechRate: one(s.speechRate, [0.75, 1, 1.25, 1.5, 2] as const, DEFAULT_SETTINGS.speechRate),
+    reduceMotion: typeof s.reduceMotion === 'boolean' ? s.reduceMotion : DEFAULT_SETTINGS.reduceMotion,
+  };
 }
 
 const without = <T,>(rec: Record<string, T>, id: string) => {
@@ -278,6 +307,7 @@ function reducer(state: State, action: Action): State {
         saved: { ...saved, seen: { ...saved.seen, [saved.currentId]: current }, acknowledged: { ...saved.acknowledged, [saved.currentId]: true } },
       };
     case 'loadShared': {
+      if (!plausible(saved.docs[action.doc.id], action.doc)) return state;
       // A merge is not undoable, but earlier actions still are: they only touch what they changed.
       const sameBoardOpen = action.doc.id === saved.currentId;
       return {
@@ -289,7 +319,7 @@ function reducer(state: State, action: Action): State {
     }
     case 'mergeLive': {
       const local = saved.docs[action.doc.id];
-      if (!local || covers(local.vv, action.doc.vv)) return state;
+      if (!local || covers(local.vv, action.doc.vv) || !plausible(local, action.doc)) return state;
       const { saved: next, fresh } = receive(saved, action.doc, false);
       return { ...state, saved: next, live: { seq: state.live.seq + 1, changes: fresh, from: action.from } };
     }
@@ -365,6 +395,7 @@ export function useHandrail() {
     loadShared: useCallback((d: Doc) => dispatch({ type: 'loadShared', doc: d }), []),
     mergeLive: useCallback((d: Doc, from: string | null) => dispatch({ type: 'mergeLive', doc: d, from }), []),
     liveArrivals: state.live,
+    isPlausible: (d: Doc) => plausible(saved.docs[d.id], d),
     createBoard: useCallback((b: Board) => dispatch({ type: 'create', board: b }), []),
     simulateTeammates: useCallback(() => dispatch({ type: 'simulate' }), []),
     switchBoard: useCallback((id: string) => dispatch({ type: 'switch', id }), []),

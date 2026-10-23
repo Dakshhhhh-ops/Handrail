@@ -3,6 +3,7 @@ import { moveCard, updateCard } from '../../src/model/board';
 import { commit, docFromBoard, materialize, mergeDocs, type Doc } from '../../src/model/crdt';
 import { demoBoard } from '../../src/model/seed';
 import { covers, createSession, type LivePeer, type Transport } from '../../src/lib/live';
+import LZString from 'lz-string';
 
 const today = new Date(2026, 9, 22);
 
@@ -52,7 +53,7 @@ function replica(net: ReturnType<typeof network>, id: string, name: string, star
       doc = mergeDocs(doc, d);
     },
     onPeers: (p) => (peers = p),
-  });
+  }, id);
   return {
     get doc() { return doc; },
     get peers() { return peers; },
@@ -128,7 +129,17 @@ describe('live sessions', () => {
     evil.send('hello', '{"name": 42}');
     const other = docFromBoard({ ...demoBoard(today), id: 'other-board' }, 'evil', 'Eve');
     evil.send('doc', JSON.stringify(other));
-    expect(priya.heard).toHaveLength(0);
+    // A forged version vector claiming Priya is far ahead must not stop her publishing.
+    const forged = JSON.parse(JSON.stringify(priya.doc));
+    forged.vv = { priya: 1e9, riya: 1e9 };
+    evil.send('doc', LZString.compressToUTF16(JSON.stringify(forged)));
+    // (Its numbers are clamped on arrival, so merging it changes nothing.)
+    const boardBefore = materialize(priya.doc);
+    expect(boardBefore.columns.map((c) => c.cardIds)).toEqual(materialize(mergeDocs(priya.doc, priya.heard.at(-1)?.doc ?? priya.doc)).columns.map((c) => c.cardIds));
+    const sentBefore = net.sent();
+    priya.edit((b) => moveCard(b, 'k-topic', 'c-todo', 0, 'Priya'));
+    expect(net.sent()).toBeGreaterThan(sentBefore);
+    expect(priya.heard.filter((h) => h.doc.id !== priya.doc.id)).toHaveLength(0);
     expect(priya.peers).toEqual([{ id: 'evil', name: null }]);
   });
 

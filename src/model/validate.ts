@@ -2,15 +2,16 @@ import { isISODate } from './dates';
 import { newId } from './board';
 import type { Board, Card, Column } from './types';
 
-export const LIMITS = { title: 200, notes: 5000, name: 60, columns: 20, cards: 1000 };
+export const LIMITS = { title: 200, notes: 5000, name: 60, columns: 200, cards: 5000 };
 
 const str = (v: unknown, max: number): string => (typeof v === 'string' ? v.slice(0, max) : '');
 const optStr = (v: unknown, max: number): string | null => {
   const s = str(v, max).trim();
   return s ? s : null;
 };
+const RESERVED = new Set(Object.getOwnPropertyNames(Object.prototype));
 const safeId = (v: unknown, prefix: string): string =>
-  typeof v === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v) ? v : newId(prefix);
+  typeof v === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(v) && !RESERVED.has(v) ? v : newId(prefix);
 
 /**
  * Turns untrusted data (a shared link, an imported file, old saved data) into a

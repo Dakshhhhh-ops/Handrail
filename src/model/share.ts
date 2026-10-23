@@ -1,4 +1,5 @@
 import LZString from 'lz-string';
+import { decompressFromEncodedURIComponent } from '../lib/lz';
 import { docFromBoard, materialize, validateDoc, type Doc } from './crdt';
 import { validateBoard } from './validate';
 import type { Board } from './types';
@@ -18,7 +19,7 @@ export function encodeBoard(board: Board): string {
 
 function unpack(data: string): unknown {
   try {
-    const json = LZString.decompressFromEncodedURIComponent(data);
+    const json = decompressFromEncodedURIComponent(data);
     return json ? JSON.parse(json) : null;
   } catch {
     return null;
@@ -33,7 +34,8 @@ export function decodeBoard(data: string): Board | null {
 export function decodeShared(data: string): Doc | null {
   if (data.startsWith(V2)) return validateDoc(unpack(data.slice(V2.length)));
   const board = decodeBoard(data);
-  return board ? docFromBoard(board, 'legacy', null) : null;
+  // Old links carry no history, so they are written as the oldest possible writes and never outvote real edits.
+  return board ? docFromBoard(board, '', null, 0) : null;
 }
 
 /** A link to the board. With `live`, opening it also joins that live session. */

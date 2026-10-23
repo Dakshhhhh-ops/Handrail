@@ -158,12 +158,18 @@ function Shell({ store }: { store: Handrail }) {
   // ---- Opening a shared link ------------------------------------------------
   useEffect(() => {
     const open = () => {
-      const shared = docFromHash(window.location.hash);
-      const room = parseHash(window.location.hash)?.live ?? null;
-      if (!window.location.hash.startsWith('#board=')) return;
+      const hash = window.location.hash;
+      if (!hash.startsWith('#board=')) return;
+      // Clear the link first, so a bad link can never break the page again on reload.
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      const shared = docFromHash(hash);
+      const room = parseHash(hash)?.live ?? null;
       if (!shared) {
         announce('That share link is broken or incomplete. Ask your teammate to copy it again.');
+        return;
+      }
+      if (!store.isPlausible(shared)) {
+        announce('That share link looks damaged or forged, so it was not merged. Ask your teammate to copy it again.');
         return;
       }
       justOpened.current = materialize(shared).title;
@@ -215,7 +221,7 @@ function Shell({ store }: { store: Handrail }) {
           known = now;
           setLive((l) => (l ? { ...l, peers } : l));
         },
-      });
+      }, store.actor, 150);
       announce('Live session open. Teammates who open the invite link will join, and their changes will be read out as they arrive.');
     } catch {
       setLive({ room, peers: [], error: 'Couldn’t start a live session. Check your connection; share links still work.' });

@@ -81,7 +81,9 @@ export const CARD_FIELDS: CardField[] = ['title', 'notes', 'due', 'assignee'];
 export function wins(x: Reg<unknown>, y: Reg<unknown>): boolean {
   if (x.c !== y.c) return x.c > y.c;
   if (x.t !== y.t) return x.t > y.t;
-  return x.a > y.a;
+  if (x.a !== y.a) return x.a > y.a;
+  // Same device, same moment (two tabs share a device id): compare the values so every replica still agrees.
+  return JSON.stringify(x.v) > JSON.stringify(y.v);
 }
 
 function pick<T>(x: Reg<T>, y: Reg<T>): Reg<T> {
@@ -138,7 +140,9 @@ function latest(rec: CardRec): Reg<unknown> {
 /** Turns a document into the plain board the UI works with. */
 export function materialize(doc: Doc): Board {
   const allCols = Object.entries(doc.cols).sort(([ia, a], [ib, b]) => byKey(a.pos.v, ia, b.pos.v, ib));
-  const alive = allCols.filter(([, r]) => r.alive.v);
+  let alive = allCols.filter(([, r]) => r.alive.v);
+  // If concurrent deletes removed every column, show the last one rather than hiding every card.
+  if (alive.length === 0 && allCols.length) alive = [allCols[allCols.length - 1]];
   const columns: Column[] = alive.map(([id, r]) => ({ id, title: r.title.v, cardIds: [] }));
   const index = new Map(columns.map((c, i) => [c.id, i]));
 
@@ -370,8 +374,16 @@ export function findConflicts(local: Doc, remote: Doc, me: string): Conflict[] {
 
 // ---- Validation of untrusted documents (links, files, storage) ------------
 
-const ID = /^[A-Za-z0-9_-]{1,64}$/;
-const ACTOR = /^[A-Za-z0-9_-]{0,40}$/;
+/** Names like "constructor" or "__proto__" would collide with built-in object properties. */
+const RESERVED = new Set(Object.getOwnPropertyNames(Object.prototype));
+const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const ACTOR_RE = /^[A-Za-z0-9_-]{0,40}$/;
+const ID = { test: (s: string) => ID_RE.test(s) && !RESERVED.has(s) };
+const ACTOR = { test: (s: string) => ACTOR_RE.test(s) && !RESERVED.has(s) };
+/** Clocks stay far below 2^53 so "+1" always makes a bigger number. */
+export const MAX_CLOCK = 2 ** 40;
+/** Writes more than a day in the future come from a broken clock or a forged link. */
+export const MAX_FUTURE_MS = 24 * 60 * 60 * 1000;
 const POS = /^[0-9A-Za-z]{1,1024}$/;
 
 function validKey(k: unknown): k is string {
@@ -387,14 +399,16 @@ function validKey(k: unknown): k is string {
 function vReg<T>(raw: unknown, check: (v: unknown) => v is T, max = 0): Reg<T> | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  if (typeof r.c !== 'number' || !Number.isInteger(r.c) || r.c < 0 || r.c > 1e12) return null;
+  if (typeof r.c !== 'number' || !Number.isInteger(r.c) || r.c < 0 || r.c > MAX_CLOCK) return null;
   // Older documents had no wall-clock time; treat it as 0.
   const t = r.t === undefined ? 0 : r.t;
-  if (typeof t !== 'number' || !Number.isFinite(t) || t < 0 || t > 1e14) return null;
+  if (typeof t !== 'number' || !Number.isFinite(t) || t < 0 || t > Date.now() + MAX_FUTURE_MS) return null;
   if (typeof r.a !== 'string' || !ACTOR.test(r.a)) return null;
   if (!(r.by === null || r.by === undefined || typeof r.by === 'string')) return null;
   // Over-long text is cut to size rather than throwing away the whole card.
-  const v = max && typeof r.v === 'string' ? r.v.slice(0, max) : r.v;
+  let v = max && typeof r.v === 'string' ? r.v.slice(0, max) : r.v;
+  // Positions keep only their two known fields.
+  if (v && typeof v === 'object' && 'col' in (v as object) && 'pos' in (v as object)) v = { col: (v as Place).col, pos: (v as Place).pos };
   if (!check(v)) return null;
   const by = typeof r.by === 'string' ? r.by.slice(0, 60) : null;
   return { v, c: r.c, t, a: r.a, by };
@@ -417,14 +431,14 @@ export function validateDoc(raw: unknown): Doc | null {
   const title = vReg(r.title, str(200), 200);
   if (!title) return null;
   const cols: Record<string, ColRec> = {};
-  for (const [id, raw] of Object.entries((r.cols as Record<string, unknown>) ?? {}).slice(0, 40)) {
+  for (const [id, raw] of Object.entries((r.cols as Record<string, unknown>) ?? {}).slice(0, 200)) {
     const x = raw as Record<string, unknown>;
     if (!ID.test(id) || !x) continue;
     const t = vReg(x.title, str(200), 200), p = vReg(x.pos, validKey), al = vReg(x.alive, bool);
     if (t && p && al) cols[id] = { title: t, pos: p, alive: al };
   }
   const cards: Record<string, CardRec> = {};
-  for (const [id, raw] of Object.entries((r.cards as Record<string, unknown>) ?? {}).slice(0, 2000)) {
+  for (const [id, raw] of Object.entries((r.cards as Record<string, unknown>) ?? {}).slice(0, 5000)) {
     const x = raw as Record<string, unknown>;
     if (!ID.test(id) || !x) continue;
     const rec = {
@@ -433,16 +447,23 @@ export function validateDoc(raw: unknown): Doc | null {
     };
     if (Object.values(rec).every(Boolean)) cards[id] = rec as CardRec;
   }
+  // Every receiver derives the clock and version vector from the writes themselves, the same way,
+  // so a forged clock or vector can't make real updates look old.
+  const regs = [title, ...Object.values(cols).flatMap((x) => [x.title, x.pos, x.alive]), ...Object.values(cards).flatMap((x) => [x.title, x.notes, x.due, x.assignee, x.place, x.alive])];
+  let clock = 0;
+  for (const g of regs) clock = Math.max(clock, g.c);
   const vv: VersionVector = {};
   for (const [a, c] of Object.entries((r.vv as Record<string, unknown>) ?? {}).slice(0, 200)) {
-    if (ACTOR.test(a) && typeof c === 'number' && Number.isInteger(c) && c >= 0) vv[a] = c;
+    if (ACTOR.test(a) && typeof c === 'number' && Number.isInteger(c) && c >= 0) vv[a] = Math.min(c, clock);
   }
-  // The clock must be at least every write we hold, or later local writes could lose.
-  let clock = typeof r.clock === 'number' && Number.isInteger(r.clock) ? r.clock : 0;
-  const regs = [title, ...Object.values(cols).flatMap((x) => [x.title, x.pos, x.alive]), ...Object.values(cards).flatMap((x) => [x.title, x.notes, x.due, x.assignee, x.place, x.alive])];
-  for (const g of regs) {
-    clock = Math.max(clock, g.c);
-    if (g.a) vv[g.a] = Math.max(vv[g.a] ?? 0, g.c);
-  }
+  for (const g of regs) if (g.a) vv[g.a] = Math.max(vv[g.a] ?? 0, g.c);
   return { kind: 'handrail-doc', v: 2, id: r.id, title, cols, cards, clock, vv };
+}
+
+/**
+ * Rejects (rather than trims) a teammate's document whose clock jumps implausibly far
+ * ahead of ours: merging it would let one bad copy outvote every future edit.
+ */
+export function plausible(local: Doc | undefined, remote: Doc): boolean {
+  return remote.clock <= (local?.clock ?? 0) + 1_000_000 && remote.clock <= MAX_CLOCK;
 }

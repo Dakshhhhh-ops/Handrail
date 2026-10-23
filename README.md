@@ -104,7 +104,9 @@ Every push to `main` runs type-checking, both test suites, and then deploys to G
 
 ## Privacy
 
-Boards are saved in your browser's local storage on your device. Nothing is sent anywhere unless you share a link yourself. There is no analytics.
+- **By default nothing leaves your device.** Boards are saved in your browser's local storage, and there are no accounts and no analytics.
+- **Share links** carry the board in the part of the address after `#`, which browsers never send to a web server. Anyone you give the link to can read the board and, by sending their copy back, edit it.
+- **Live sessions are opt-in.** To find each other, browsers exchange connection details through public Nostr relays (encrypted with the room code) and public STUN servers; after that, board data goes directly between browsers over encrypted WebRTC. As with any peer-to-peer call, people in the same session can see each other's IP address. Anyone with the invite link can join and edit, so only send it to your group.
 
 ## License
 
