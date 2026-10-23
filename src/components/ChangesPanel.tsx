@@ -13,8 +13,11 @@ function summary(changes: Change[]) {
  * list to one row, which stays until new changes arrive.
  */
 export function ChangesPanel({
-  changes, acknowledged, justMine, board, digest, onGoTo, onReadAll, onDone, onReplay,
+  changes, acknowledged, justMine, board, digest, onGoTo, onReadAll, onDone, onReplay, hasBefore, showingBefore, onToggleBefore,
 }: {
+  hasBefore: boolean;
+  showingBefore: boolean;
+  onToggleBefore: () => void;
   /** Shows each change on the board (cursors fly to the cards). */
   onReplay: () => void;
   /** One short paragraph summing up the changes, grouped by person. */
@@ -87,6 +90,11 @@ export function ChangesPanel({
           )}
           <div className="changes-actions">
             <button type="button" className="btn btn-secondary small" onClick={onReplay}>Show me on the board</button>
+            {hasBefore && (
+              <button type="button" className="btn btn-secondary small" aria-pressed={showingBefore} onClick={onToggleBefore}>
+                Before / now
+              </button>
+            )}
             <button type="button" className="btn btn-secondary small" onClick={onReadAll}>Read aloud</button>
             {acknowledged ? (
               <button type="button" className="btn btn-secondary small" aria-expanded="true" onClick={() => { setExpanded(false); requestAnimationFrame(() => document.getElementById('changes-show')?.focus()); }}>

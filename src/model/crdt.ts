@@ -180,7 +180,9 @@ export function materialize(doc: Doc): Board {
       columns[home(r.place.v.col)].cardIds.push(id);
     }
   }
-  return { id: doc.id, title: doc.title.v || 'Untitled board', columns, cards, updatedAt: doc.clock };
+  const removed: Record<string, { title: string; by: string | null }> = {};
+  for (const [id, r] of Object.entries(doc.cards)) if (!r.alive.v) removed[id] = { title: r.title.v, by: r.alive.by };
+  return { id: doc.id, title: doc.title.v || 'Untitled board', columns, cards, updatedAt: doc.clock, titleBy: doc.title.by, removed };
 }
 
 // ---- Commit ----------------------------------------------------------------
@@ -339,7 +341,10 @@ export function docFromBoard(board: Board, actor: string, by: string | null, now
 
 export interface Conflict {
   cardId: string | null;
-  field: CardField | 'place' | 'alive' | 'title';
+  /** 'deleted-edited': you deleted it while they changed it; 'edited-deleted': the other way round. */
+  field: CardField | 'place' | 'alive' | 'title' | 'column' | 'deleted-edited' | 'edited-deleted';
+  /** For column clashes: the column's id. */
+  columnId?: string;
   /** Whose write was kept. */
   kept: 'yours' | 'theirs';
   /** Name on the other side of the conflict. */
@@ -362,12 +367,29 @@ export function findConflicts(local: Doc, remote: Doc, me: string): Conflict[] {
     out.push({ cardId, field, kept: wins(theirs, mine) ? 'theirs' : 'yours', other: theirs.by });
   };
   check(null, 'title', local.title, remote.title);
+  for (const [id, mine] of Object.entries(local.cols)) {
+    const theirs = remote.cols[id];
+    if (!theirs) continue;
+    const before = out.length;
+    check(null, 'column', mine.title, theirs.title);
+    if (out.length > before) out[out.length - 1].columnId = id;
+  }
+  const unseenByThem = (r: Reg<unknown>) => r.a === me && r.c > (remote.vv[me] ?? 0);
+  const unseenByMe = (r: Reg<unknown>) => r.a !== me && r.c > (local.vv[r.a] ?? 0);
   for (const [id, mine] of Object.entries(local.cards)) {
     const theirs = remote.cards[id];
     if (!theirs) continue;
     for (const f of CARD_FIELDS) check(id, f, mine[f], theirs[f]);
     check(id, 'place', mine.place, theirs.place);
     check(id, 'alive', mine.alive, theirs.alive);
+    // A delete on one side while the other side was still editing the card.
+    const theirEdit = [...CARD_FIELDS.map((f) => theirs[f]), theirs.place].find((r) => unseenByMe(r) && theirs.alive.v);
+    const myEdit = [...CARD_FIELDS.map((f) => mine[f]), mine.place].find((r) => unseenByThem(r) && mine.alive.v);
+    if (!mine.alive.v && unseenByThem(mine.alive) && theirEdit) {
+      out.push({ cardId: id, field: 'deleted-edited', kept: wins(theirs.alive, mine.alive) ? 'theirs' : 'yours', other: theirEdit.by });
+    } else if (!theirs.alive.v && unseenByMe(theirs.alive) && myEdit) {
+      out.push({ cardId: id, field: 'edited-deleted', kept: 'theirs', other: theirs.alive.by });
+    }
   }
   return out;
 }

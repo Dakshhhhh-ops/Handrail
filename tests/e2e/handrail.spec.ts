@@ -284,6 +284,25 @@ test.describe('activity panel', () => {
     await expect(reply(page)).toContainText('1 change since you last looked. Riya gave you');
   });
 
+  test('Before / now flips the board to how it looked before the changes, read-only', async ({ page }) => {
+    await simulate(page);
+    const toggle = page.getByRole('button', { name: 'Before / now' });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(live(page)).toContainText('Showing the board as you last saw it, before 4 changes');
+    await expect(cardIn(page, 'To do', 'Design slides')).toBeVisible();
+    await expect(page.locator('[data-card]', { hasText: 'Rehearse together' })).toHaveCount(0);
+    // Reading works, changing doesn't.
+    await cardIn(page, 'To do', 'Design slides').focus();
+    await page.keyboard.press('3');
+    await expect(live(page)).toContainText('This is how the board looked before');
+    await page.keyboard.press('Alt+ArrowRight');
+    await expect(cardIn(page, 'To do', 'Design slides')).toBeVisible();
+    await page.getByRole('button', { name: 'Show now' }).click();
+    await expect(cardIn(page, 'Done', 'Design slides')).toBeVisible();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+
   test('cards teammates changed are marked on the board until you press Got it', async ({ page }) => {
     await simulate(page);
     const email = cardIn(page, 'To do', 'Email Dr. Mehta');
@@ -486,6 +505,7 @@ test.describe('automated accessibility audit (axe, WCAG 2.2 AA)', () => {
   const audit = async (page: Page) => {
     // Check the settled page: wait for one-off animations (fades, pops) to finish. Looping ones are decorative.
     await page.waitForFunction(() =>
+      !document.querySelector('.cursor-layer') &&
       document.getAnimations().every((an) => an.playState !== 'running' || an.effect?.getTiming().iterations === Infinity),
     );
     const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze();
@@ -546,6 +566,8 @@ test.describe('the story (first visit)', () => {
     await expect(page.getByRole('button', { name: 'Open the board' }).first()).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+    await expect(page.locator('#board-switcher')).toBeFocused();
+    await expect(page.getByTestId('live-region')).toContainText('Board opened');
     // Returning visitors go straight to the board.
     await page.reload();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
@@ -577,13 +599,13 @@ test.describe('the story (first visit)', () => {
     await expect(nav.getByRole('button', { name: 'Merge' })).toHaveAttribute('aria-current', 'step', { timeout: 5000 });
     const pause = page.getByRole('button', { name: 'Pause animation' });
     await pause.click();
-    await expect(page.getByRole('button', { name: 'Play animation' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(pause).toHaveAttribute('aria-pressed', 'true');
     // The floating board stops moving.
     const pose = () => page.locator('.iso-float').evaluate((el) => getComputedStyle(el).transform);
     const a = await pose();
     await page.waitForTimeout(700);
     expect(await pose()).toBe(a);
-    await page.getByRole('button', { name: 'Play animation' }).click();
+    await pause.click();
     await page.waitForTimeout(700);
     expect(await pose()).not.toBe(a);
     await ctx.close();

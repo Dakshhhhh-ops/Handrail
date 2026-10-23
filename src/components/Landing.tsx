@@ -265,7 +265,7 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
           </button>
           {moving.current && (
             <button type="button" className="btn btn-secondary" aria-pressed={paused} onClick={() => setPaused((p) => !p)}>
-              {paused ? 'Play animation' : 'Pause animation'}
+              Pause animation
             </button>
           )}
         </div>

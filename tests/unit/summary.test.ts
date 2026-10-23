@@ -3,7 +3,7 @@ import { commit, docFromBoard, findConflicts, materialize, mergeDocs } from '../
 import { describeConflicts, diffBoards, type Change } from '../../src/model/diff';
 import { demoBoard, demoTeammateEdits } from '../../src/model/seed';
 import { listJoin, summarize } from '../../src/model/summary';
-import { updateCard } from '../../src/model/board';
+import { deleteCard, deleteColumn, renameColumn, updateCard } from '../../src/model/board';
 
 const today = new Date(2026, 9, 22);
 
@@ -44,5 +44,48 @@ describe('summarize', () => {
     expect(listJoin(['a'])).toBe('a');
     expect(listJoin(['a', 'b'])).toBe('a and b');
     expect(listJoin(['a', 'b', 'c'])).toBe('a, b and c');
+  });
+});
+
+describe('what changed: the harder cases', () => {
+  const base = () => docFromBoard(demoBoard(today), 'seed', null, 1);
+  const changes = (mine: ReturnType<typeof base>, theirs: ReturnType<typeof base>) => {
+    const merged = mergeDocs(mine, theirs);
+    return [
+      ...describeConflicts(findConflicts(mine, theirs, 'priya'), materialize(merged)),
+      ...diffBoards(materialize(mine), materialize(merged), 'Priya', today),
+    ].map((c) => c.text);
+  };
+
+  it('says who renamed the board and who deleted a card', () => {
+    const b = base();
+    let v = materialize(b);
+    v = { ...v, title: 'Climate talk (final)' };
+    v = deleteCard(v, 'k-topic');
+    const riya = commit(b, v, 'riya', 'Riya', 5);
+    expect(changes(b, riya)).toEqual(['Riya renamed the board to “Climate talk (final)”.', 'Riya deleted “Pick the topic”.']);
+  });
+
+  it('explains cards that moved because their column was deleted', () => {
+    const b = base();
+    const riya = commit(b, deleteColumn(materialize(b), 'c-doing'), 'riya', 'Riya', 5);
+    expect(changes(b, riya)).toContain('“Draft the outline” is now in To do, because the Doing column was removed.');
+  });
+
+  it('notices a delete on one side while the other side was editing', () => {
+    const b = base();
+    const priya = commit(b, deleteCard(materialize(b), 'k-slides'), 'priya', 'Priya', 5);
+    const riya = commit(b, updateCard(materialize(b), 'k-slides', { title: 'Slides v2' }, 'Riya'), 'riya', 'Riya', 6);
+    expect(changes(priya, riya)[0]).toBe('Riya changed “Slides v2” while you were deleting it. It stays deleted; undo your delete to bring it back with Riya’s changes.');
+    const priya2 = commit(b, updateCard(materialize(b), 'k-slides', { title: 'Slides v2' }, 'Priya'), 'priya', 'Priya', 5);
+    const riya2 = commit(b, deleteCard(materialize(b), 'k-slides'), 'riya', 'Riya', 6);
+    expect(changes(priya2, riya2)[0]).toBe('Riya deleted “Slides v2” while you were changing it, so your change is not on the board.');
+  });
+
+  it('notices clashing column renames', () => {
+    const b = base();
+    const priya = commit(b, renameColumn(materialize(b), 'c-doing', 'In progress'), 'priya', 'Priya', 5);
+    const riya = commit(b, renameColumn(materialize(b), 'c-doing', 'Working'), 'riya', 'Riya', 6);
+    expect(changes(priya, riya)[0]).toBe('You and Riya both renamed the column now called “Working” at the same time. Handrail kept Riya’s. Rename it again if you want yours back.');
   });
 });

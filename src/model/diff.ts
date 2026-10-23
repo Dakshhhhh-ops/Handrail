@@ -31,6 +31,9 @@ export function diffBoards(before: Board, after: Board, me: string | null, today
 
   const beforeCols = new Map(before.columns.map((c) => [c.id, c]));
   const afterCols = new Map(after.columns.map((c) => [c.id, c]));
+  if (before.title !== after.title && !mine(after.titleBy ?? null)) {
+    out.push({ kind: 'column', text: `${by(after.titleBy ?? null)} renamed the board to “${after.title}”.`, forYou: false, by: after.titleBy ?? null });
+  }
   for (const c of after.columns) {
     const old = beforeCols.get(c.id);
     if (!old) out.push({ kind: 'column', text: `New column “${c.title}”.`, forYou: false });
@@ -67,9 +70,14 @@ export function diffBoards(before: Board, after: Board, me: string | null, today
 
       const oldLoc = locate(before, id);
       if (oldLoc && oldLoc.column.id !== col.id) {
-        const fromName = afterCols.get(oldLoc.column.id)?.title ?? oldLoc.column.title;
-        const who = author('place');
-        push({ kind: 'moved', cardId: id, title: now.title, to: col.title, text: `${by(who)} moved “${now.title}” from ${fromName} to ${col.title}.`, forYou }, who);
+        if (!afterCols.has(oldLoc.column.id)) {
+          // Its column was deleted, so it now shows in the neighbouring column.
+          out.push({ kind: 'moved', cardId: id, title: now.title, to: col.title, text: `“${now.title}” is now in ${col.title}, because the ${oldLoc.column.title} column was removed.`, forYou, by: null });
+        } else {
+          const fromName = afterCols.get(oldLoc.column.id)?.title ?? oldLoc.column.title;
+          const who = author('place');
+          push({ kind: 'moved', cardId: id, title: now.title, to: col.title, text: `${by(who)} moved “${now.title}” from ${fromName} to ${col.title}.`, forYou }, who);
+        }
       }
       if (!sameName(was.assignee, now.assignee) && (was.assignee || now.assignee)) {
         const who = author('assignee');
@@ -95,7 +103,9 @@ export function diffBoards(before: Board, after: Board, me: string | null, today
   for (const id of Object.keys(before.cards)) {
     if (!after.cards[id] && locate(before, id)) {
       const was = before.cards[id];
-      out.push({ kind: 'removed', title: was.title, text: `“${was.title}” was removed.`, forYou: mine(was.assignee) });
+      const who = after.removed?.[id]?.by ?? null;
+      if (who && mine(who)) continue;
+      out.push({ kind: 'removed', title: was.title, text: who ? `${by(who)} deleted “${was.title}”.` : `“${was.title}” was removed.`, forYou: mine(was.assignee), by: who });
     }
   }
 
@@ -109,7 +119,30 @@ export function describeConflicts(conflicts: Conflict[], board: Board): Change[]
     const title = c.cardId ? board.cards[c.cardId]?.title ?? 'a card that was deleted since' : null;
     const other = c.other ?? 'a teammate';
     const otherOwn = c.other ? `${c.other}’s` : 'theirs';
+    if (c.field === 'deleted-edited') {
+      return {
+        kind: 'conflict' as const,
+        cardId: c.cardId && board.cards[c.cardId] ? c.cardId : undefined,
+        title: board.removed?.[c.cardId ?? '']?.title ?? title ?? undefined,
+        text: `${other} changed “${board.removed?.[c.cardId ?? '']?.title ?? title}” while you were deleting it. It stays deleted; undo your delete to bring it back with ${c.other ? `${c.other}’s` : 'their'} changes.`,
+        forYou: true,
+        by: c.other,
+      };
+    }
+    if (c.field === 'edited-deleted') {
+      return {
+        kind: 'conflict' as const,
+        title: board.removed?.[c.cardId ?? '']?.title ?? undefined,
+        text: `${other} deleted “${board.removed?.[c.cardId ?? '']?.title ?? 'a card'}” while you were changing it, so your change is not on the board.`,
+        forYou: true,
+        by: c.other,
+      };
+    }
+    const colTitle = c.columnId ? board.columns.find((x) => x.id === c.columnId)?.title : null;
     const what = {
+      column: `renamed the column now called “${colTitle ?? '?'}”`,
+      'deleted-edited': '',
+      'edited-deleted': '',
       title: c.cardId ? `renamed “${title}”` : 'renamed the board',
       notes: `edited the notes on “${title}”`,
       due: `changed the due date of “${title}”`,
@@ -117,7 +150,8 @@ export function describeConflicts(conflicts: Conflict[], board: Board): Change[]
       place: `moved “${title}”`,
       alive: `changed whether “${title}” exists (one of you deleted it)`,
     }[c.field];
-    const kept = c.kept === 'yours' ? 'kept yours' : `kept ${otherOwn}. Edit the card if you want yours back`;
+    const fix = c.field === 'column' || (c.field === 'title' && !c.cardId) ? 'Rename it again' : 'Edit the card';
+    const kept = c.kept === 'yours' ? 'kept yours' : `kept ${otherOwn}. ${fix} if you want yours back`;
     return {
       kind: 'conflict' as const,
       cardId: c.cardId && board.cards[c.cardId] ? c.cardId : undefined,

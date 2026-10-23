@@ -100,7 +100,10 @@ export function BoardView({
   visible,
   layout = 'columns',
   changed,
+  readOnly = false,
 }: {
+  /** Showing an earlier version: you can move around and read, but not change anything. */
+  readOnly?: boolean;
   /** Cards teammates changed since you last looked, with a short label like "Riya · moved". */
   changed?: Record<string, string>;
   layout?: 'columns' | 'stacked';
@@ -288,6 +291,18 @@ export function BoardView({
     }
 
     if (e.ctrlKey || e.metaKey) return;
+    if (readOnly) {
+      // An earlier version: moving around and reading are fine, changing is not.
+      const reading = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'i', 'I'].includes(e.key) && !e.altKey && !e.shiftKey;
+      if (!reading) {
+        const action = e.key === 'Enter' || e.key === ' ' || e.key.startsWith('Arrow') || /^[1-9eEnNmM]$/.test(e.key) || ['Delete', 'Backspace', 'F2'].includes(e.key);
+        if (action) {
+          handled();
+          announce('This is how the board looked before. Choose “Show now” to make changes.');
+        }
+        return;
+      }
+    }
     switch (e.key) {
       case 'ArrowUp':
       case 'ArrowDown':
@@ -382,7 +397,7 @@ export function BoardView({
 
   return (
     <>
-    <div className={`board-wrap layout-${layout}`} onFocus={revealFocus}>
+    <div className={`board-wrap layout-${layout}${readOnly ? ' is-before' : ''}`} onFocus={revealFocus}>
     <div
       ref={boardRef}
       id="board"
@@ -466,9 +481,9 @@ export function BoardView({
                       aria-describedby="card-hint"
                       onFocus={() => { setFocusedCardId(id); setCardFocused(true); }}
                       onBlur={() => setCardFocused(false)}
-                      onClick={() => (grabbed ? drop() : cb.openActions(id))}
+                      onClick={() => (readOnly ? announce('This is how the board looked before. Choose “Show now” to make changes.') : grabbed ? drop() : cb.openActions(id))}
                       onKeyDown={(e) => onCardKey(e, id)}
-                      draggable
+                      draggable={!readOnly}
                       onPointerMove={tilt}
                       onPointerLeave={untilt}
                       onDragStart={(e) => onDragStart(e, id)}
@@ -483,7 +498,7 @@ export function BoardView({
                 );
               })}
             </ol>
-            <button type="button" className="btn btn-ghost add-card" onClick={() => cb.openEditor(null, col.id)}>
+            <button type="button" className="btn btn-ghost add-card" onClick={() => cb.openEditor(null, col.id)} hidden={readOnly}>
               <PlusIcon size={16} /> Add card<span className="sr-only"> to {col.title}</span>
             </button>
           </section>

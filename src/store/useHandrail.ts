@@ -43,6 +43,8 @@ interface Saved {
   seen: Record<string, Board>;
   /** Teammates' changes not yet acknowledged, worked out when a shared link was opened. */
   inbox: Record<string, Change[]>;
+  /** The board as it was before the changes in the inbox, for the Before / Now comparison. */
+  before?: Record<string, Board>;
   /** Boards whose inbox the user acknowledged with "Got it" (shown collapsed until new changes arrive). */
   acknowledged: Record<string, boolean>;
   settings: Settings;
@@ -160,7 +162,13 @@ export function loadSaved(): Saved {
           by: typeof c.by === 'string' ? c.by.slice(0, 60) : null,
         }));
     }
+    const before: Record<string, Board> = {};
+    for (const [id, b] of Object.entries((parsed as { before?: Record<string, unknown> }).before ?? {})) {
+      const v = validateBoard(b);
+      if (v && docs[id] && inbox[id]) before[id] = v;
+    }
     return {
+      before,
       actor,
       docs,
       currentId: parsed.currentId && docs[parsed.currentId] ? parsed.currentId : ids[0],
@@ -231,7 +239,10 @@ function receive(saved: Saved, remote: Doc, open = true): { saved: Saved; fresh:
   ];
   // New changes replace an acknowledged list; otherwise they add to what is still unread.
   const wasAcknowledged = !!saved.acknowledged[remote.id];
+  const startsNewBatch = wasAcknowledged || !(saved.inbox[remote.id]?.length);
   const unread = fresh.length && wasAcknowledged ? fresh : [...(saved.inbox[remote.id] ?? []), ...fresh];
+  const before = { ...(saved.before ?? {}) };
+  if (fresh.length && base && (startsNewBatch || !before[remote.id])) before[remote.id] = base;
   return {
     fresh,
     saved: {
@@ -241,6 +252,7 @@ function receive(saved: Saved, remote: Doc, open = true): { saved: Saved; fresh:
       seen: { ...saved.seen, [remote.id]: now },
       inbox: unread.length ? { ...saved.inbox, [remote.id]: unread } : without(saved.inbox, remote.id),
       acknowledged: fresh.length ? without(saved.acknowledged, remote.id) : saved.acknowledged,
+      before: unread.length ? before : without(before, remote.id),
     },
   };
 }
@@ -254,6 +266,7 @@ function created(saved: Saved, board: Board): Saved {
     seen: { ...saved.seen, [doc.id]: view(doc) },
     inbox: without(saved.inbox, doc.id),
     acknowledged: without(saved.acknowledged, doc.id),
+    before: without(saved.before ?? {}, doc.id),
   };
 }
 
@@ -380,6 +393,8 @@ export function useHandrail() {
     me: saved.settings.name.trim() || null,
     changes,
     changesAcknowledged: !!saved.acknowledged[saved.currentId],
+    /** How the board looked before the changes listed in Activity, if there are any. */
+    beforeBoard: (saved.inbox[saved.currentId]?.length ? saved.before?.[saved.currentId] : undefined) ?? null,
     canUndo: state.past.length > 0,
     canRedo: state.future.length > 0,
     undoLabel: state.past[state.past.length - 1]?.label ?? null,

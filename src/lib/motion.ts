@@ -48,7 +48,7 @@ export function playMoves(board: HTMLElement | null, before: Rects, after: Rects
     const dy = was.top - now.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
     const far = Math.hypot(dx, dy) > 60;
-    el.animate(
+    const anim = el.animate(
       far
         ? [
             { transform: `translate(${dx}px, ${dy}px)`, zIndex: 5 },
@@ -58,6 +58,10 @@ export function playMoves(board: HTMLElement | null, before: Rects, after: Rects
         : [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }],
       { duration: far ? 560 : 260, easing: EASE },
     );
+    // Focus may have scrolled to where the card started; once it lands, make sure it is in view.
+    anim.finished.then(() => {
+      if (document.activeElement === el) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }, () => {});
   }
 }
 

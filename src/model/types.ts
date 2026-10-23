@@ -24,6 +24,10 @@ export interface Board {
   columns: Column[];
   cards: Record<string, Card>;
   updatedAt: number;
+  /** Who last renamed the board, when known (from the shared document). */
+  titleBy?: string | null;
+  /** Deleted cards and who deleted them, when known (from the shared document). */
+  removed?: Record<string, { title: string; by: string | null }>;
 }
 
 export interface CardLocation {

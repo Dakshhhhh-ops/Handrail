@@ -48,6 +48,7 @@ function showStoryFirst(): boolean {
 
 export default function App() {
   const [story, setStory] = useState(showStoryFirst);
+  const [arrived, setArrived] = useState(false);
   const store = useHandrail();
   const enter = useCallback(() => {
     try {
@@ -56,11 +57,12 @@ export default function App() {
       /* ignore */
     }
     window.scrollTo(0, 0);
+    setArrived(true);
     setStory(false);
   }, []);
   return (
     <AnnouncerProvider speakAloud={store.settings.speak} rate={store.settings.speechRate}>
-      {story ? <Landing onEnter={enter} /> : <Shell store={store} onStory={() => { window.scrollTo(0, 0); setStory(true); }} />}
+      {story ? <Landing onEnter={enter} /> : <Shell store={store} arrived={arrived} onStory={() => { window.scrollTo(0, 0); setStory(true); }} />}
     </AnnouncerProvider>
   );
 }
@@ -87,7 +89,7 @@ function useToday(): Date {
   return useMemo(() => new Date(day), [day]);
 }
 
-function Shell({ store, onStory }: { store: Handrail; onStory: () => void }) {
+function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => void; arrived: boolean }) {
   const { announce } = useAnnounce();
   const today = useToday();
   const { board, me, settings } = store;
@@ -109,6 +111,12 @@ function Shell({ store, onStory }: { store: Handrail; onStory: () => void }) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const historyId = useRef(0);
   const [justMine, setJustMine] = useState(false);
+  const [showBefore, setShowBefore] = useState(false);
+  const before = store.beforeBoard;
+  const viewing = showBefore && before ? before : store.board;
+  // Any change to the real board (yours or a teammate's) brings you back to now.
+  const docNow = store.doc;
+  useEffect(() => setShowBefore(false), [docNow]);
   const [live, setLive] = useState<LiveStatus | null>(null);
   const session = useRef<LiveSession | null>(null);
   const liveBoard = useRef<string | null>(null);
@@ -297,6 +305,12 @@ function Shell({ store, onStory }: { store: Handrail; onStory: () => void }) {
 
   useEffect(() => {
     entrance(document.querySelector<HTMLElement>('main'));
+    // Coming from the story: land somewhere useful, and say where.
+    if (arrived) {
+      focusLater('board-switcher');
+      announce(`Board opened: ${store.board.title}. Press slash to type a command, or Tab to reach the cards.`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---- Undo / redo -----------------------------------------------------------
@@ -516,6 +530,14 @@ function Shell({ store, onStory }: { store: Handrail; onStory: () => void }) {
     restoreFocus(el);
   }
 
+  function toggleBefore(next: boolean) {
+    if (next && !before) return;
+    setShowBefore(next);
+    announce(next
+      ? `Showing the board as you last saw it, before ${store.changes.length} ${store.changes.length === 1 ? 'change' : 'changes'}. You can move around and read cards, but not change them.`
+      : 'Showing the board as it is now.');
+  }
+
   function toggleJustMine() {
     if (!me) {
       announce('Set your name in Settings first, so Handrail knows which cards are yours.');
@@ -558,6 +580,9 @@ function Shell({ store, onStory }: { store: Handrail; onStory: () => void }) {
       digest={summarize(justMine ? store.changes.filter((c) => c.forYou) : store.changes, me, today)}
       onReadAll={() => announce(readChanges())}
       onReplay={() => replayChanges(justMine ? store.changes.filter((c) => c.forYou) : store.changes)}
+      hasBefore={!!before}
+      showingBefore={showBefore && !!before}
+      onToggleBefore={() => toggleBefore(!(showBefore && before))}
       onDone={() => {
         store.markSeen();
         announce('Marked as seen. The changes stay collapsed in Activity until new ones arrive.');
@@ -637,9 +662,19 @@ function Shell({ store, onStory }: { store: Handrail; onStory: () => void }) {
           {justMineButton}
         </div>
 
+          {showBefore && before && (
+            <div className="before-banner">
+              <p>
+                <strong>Before.</strong> This is how the board looked when you last saw it, before {store.changes.length}{' '}
+                {store.changes.length === 1 ? 'change' : 'changes'}. Nothing can be changed in this view.
+              </p>
+              <button type="button" className="btn btn-primary small" onClick={() => toggleBefore(false)}>Show now</button>
+            </div>
+          )}
           <BoardView
+            readOnly={showBefore && !!before}
             layout={settings.layout}
-            board={board}
+            board={viewing}
             today={today}
             me={me}
             focusedCardId={focusedCardId}
@@ -647,7 +682,7 @@ function Shell({ store, onStory }: { store: Handrail; onStory: () => void }) {
             highlightId={highlightId}
             cb={cb}
             visible={visible}
-            changed={changedCards}
+            changed={showBefore ? undefined : changedCards}
           />
       </main>
       <footer className="footer">

@@ -857,8 +857,8 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
   :root:not([data-motion='reduce']) .btn-primary:hover:not(:disabled) .icon { animation: wiggle 0.4s ease-in-out; }
   :root:not([data-motion='reduce']) .card:hover { background-image: radial-gradient(circle at var(--mx, 50%) var(--my, 0%), rgb(255 211 92 / 0.28), transparent 60%); }
   :root:not([data-motion='reduce']) .card { transition: transform 0.18s ease-out, box-shadow 0.18s, background-color 0.15s; }
-  :root:not([data-motion='reduce']) .layout::before { animation: twinkle 7s ease-in-out infinite alternate; }
-  :root:not([data-motion='reduce']) .status-pill .dot { animation: pulse 2.4s ease-in-out infinite; }
+  :root:not([data-motion='reduce']) .layout::before { animation: twinkle 3s ease-in-out 2 alternate; }
+  :root:not([data-motion='reduce']) .status-pill.is-live .dot { animation: pulse 2.4s ease-in-out 2; }
 }
 @keyframes pop-in { from { opacity: 0; transform: translateY(18px) scale(0.94) rotate(-1deg); } }
 @keyframes rise-in { from { transform: translateY(100%); } }
@@ -891,3 +891,14 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 @media (prefers-color-scheme: light) { :root[data-theme='system'] .layout::before { display: none; } }
 .main-col, .activity { position: relative; z-index: 1; }
 .activity { position: sticky; }
+
+/* ---- Before / now ---------------------------------------------------------------------- */
+.before-banner {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem;
+  margin: 0 0 1rem; padding: 0.75rem 1rem;
+  border: 2px dashed var(--butter); border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.before-banner p { margin: 0; }
+.board-wrap.is-before .card { border-style: dashed; filter: saturate(0.6); }
+.board-wrap.is-before .column { border-style: dashed; }
