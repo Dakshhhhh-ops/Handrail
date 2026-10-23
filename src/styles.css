@@ -275,6 +275,19 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .activity-scroll h3 { font-size: 1.05rem; margin-bottom: 0.5rem; }
 .activity-input { border-top: 1px solid var(--border); padding: 0.75rem 1rem 0.9rem; background: var(--surface); }
 .empty-note { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.live-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.8rem; border-radius: var(--radius-lg); border: 1px solid var(--border-strong); background: var(--surface); }
+.live-bar p { margin: 0; display: flex; align-items: center; gap: 0.5rem; }
+.live-bar.is-connected { border-color: var(--accent); background: var(--accent-soft); }
+.live-actions { display: flex; gap: 0.4rem; }
+.live-dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; border: 2px solid var(--accent); flex: none; }
+.is-connected .live-dot { background: var(--accent); }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion='reduce']) .is-connected .live-dot { animation: pulse 2s ease-in-out infinite; }
+}
+@keyframes pulse { 50% { opacity: 0.35; } }
+.live-share { border-top: 1px solid var(--border); padding-top: 0.9rem; display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; }
+.live-share p { margin: 0; }
+.live-share .field { align-self: stretch; }
 .name-prompt { display: flex; flex-direction: column; gap: 0.4rem; padding: 0.9rem; border-radius: var(--radius-lg); background: var(--accent-soft); border: 1px solid var(--accent); }
 
 /* ---- Command bar -------------------------------------------------------- */

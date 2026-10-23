@@ -9,7 +9,7 @@ import { previewCommand } from './model/preview';
 import { summarize } from './model/summary';
 import { findColumn, findPerson } from './model/match';
 import { demoBoard } from './model/seed';
-import { docFromHash } from './model/share';
+import { docFromHash, parseHash } from './model/share';
 import { materialize } from './model/crdt';
 import type { Board } from './model/types';
 import { useHandrail, type Handrail } from './store/useHandrail';
@@ -17,7 +17,8 @@ import { AnnouncerProvider, useAnnounce } from './components/Announcer';
 import { BoardView } from './components/BoardView';
 import { CommandBar } from './components/CommandBar';
 import { ChangesPanel } from './components/ChangesPanel';
-import { ActivityContent, NamePrompt, type HistoryEntry } from './components/ActivityPanel';
+import { ActivityContent, LiveBar, NamePrompt, type HistoryEntry, type LiveStatus } from './components/ActivityPanel';
+import { createSession, newRoomCode, trysteroTransport, type LiveSession } from './lib/live';
 import { Modal } from './components/Modal';
 import { useMediaQuery } from './lib/useMediaQuery';
 import { CheckIcon, ChevronDownIcon, RedoIcon, UndoIcon } from './components/Icons';
@@ -77,6 +78,11 @@ function Shell({ store }: { store: Handrail }) {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const historyId = useRef(0);
   const [justMine, setJustMine] = useState(false);
+  const [live, setLive] = useState<LiveStatus | null>(null);
+  const session = useRef<LiveSession | null>(null);
+  const liveBoard = useRef<string | null>(null);
+  const docRef = useRef(store.doc);
+  docRef.current = store.doc;
   const dockRef = useRef<HTMLDivElement>(null);
 
   // Keep the phone dock's height in a CSS variable so nothing hides behind it.
@@ -144,6 +150,7 @@ function Shell({ store }: { store: Handrail }) {
   useEffect(() => {
     const open = () => {
       const shared = docFromHash(window.location.hash);
+      const room = parseHash(window.location.hash)?.live ?? null;
       if (!window.location.hash.startsWith('#board=')) return;
       window.history.replaceState(null, '', window.location.pathname + window.location.search);
       if (!shared) {
@@ -152,6 +159,7 @@ function Shell({ store }: { store: Handrail }) {
       }
       justOpened.current = materialize(shared).title;
       store.loadShared(shared);
+      if (room) void startLive(room, shared.id);
     };
     open();
     window.addEventListener('hashchange', open);
@@ -176,6 +184,64 @@ function Shell({ store }: { store: Handrail }) {
       announce(`Opened the shared “${title}”. Nothing new since you last looked.`);
     }
   }, [store.changes, focusLater, announce, wide]);
+
+  // ---- Live sessions ----------------------------------------------------------
+  async function startLive(room: string, boardId = store.board.id) {
+    session.current?.leave();
+    session.current = null;
+    liveBoard.current = boardId;
+    setLive({ room, peers: [] });
+    try {
+      const transport = await trysteroTransport(boardId, room);
+      let known = new Map<string, string | null>();
+      session.current = createSession(transport, store.me, {
+        getDoc: () => docRef.current,
+        onDoc: (doc, from) => store.mergeLive(doc, from.name),
+        onPeers: (peers) => {
+          // Say who came and went, once each.
+          const now = new Map(peers.map((p) => [p.id, p.name]));
+          for (const [id, name] of now) if (!known.has(id) && name) announce(`${name} joined the live session.`);
+          for (const [id, name] of known) if (!now.has(id)) announce(`${name ?? 'A teammate'} left the live session.`);
+          for (const [id, name] of now) if (known.has(id) && !known.get(id) && name) announce(`${name} joined the live session.`);
+          known = now;
+          setLive((l) => (l ? { ...l, peers } : l));
+        },
+      });
+      announce('Live session open. Teammates who open the invite link will join, and their changes will be read out as they arrive.');
+    } catch {
+      setLive({ room, peers: [], error: 'Couldn’t start a live session. Check your connection; share links still work.' });
+    }
+  }
+
+  function leaveLive() {
+    session.current?.leave();
+    session.current = null;
+    setLive(null);
+    announce('You left the live session. Your board stays as it is.');
+  }
+
+  useEffect(() => () => session.current?.leave(), []);
+  // Send each of your own edits to the room (merged copies that add nothing are skipped).
+  useEffect(() => {
+    session.current?.publish(store.doc);
+  }, [store.doc]);
+  useEffect(() => {
+    session.current?.setName(store.me);
+  }, [store.me]);
+  // A live room belongs to one board.
+  useEffect(() => {
+    if (session.current && liveBoard.current && store.board.id !== liveBoard.current) leaveLive();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.board.id]);
+  // Read out teammates' edits as they arrive.
+  useEffect(() => {
+    const { changes, seq } = store.liveArrivals;
+    if (!seq || !changes.length) return;
+    announce(summarize(changes, me, today));
+    const first = changes.find((c) => c.cardId)?.cardId;
+    if (first) setHighlightId(first);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.liveArrivals.seq]);
 
   // ---- Undo / redo -----------------------------------------------------------
   const undo = useCallback((): string => {
@@ -403,6 +469,7 @@ function Shell({ store }: { store: Handrail }) {
 
   const changesPanel = (
     <>
+    {live && <LiveBar live={live} onInvite={() => openDialog('share')} onLeave={leaveLive} />}
     {!me && (
       <NamePrompt
         onSave={(name) => {
@@ -571,7 +638,8 @@ function Shell({ store }: { store: Handrail }) {
       />
       <SettingsDialog open={dialog === 'settings'} onClose={closeDialog} settings={settings} onChange={store.updateSettings} />
       <HelpDialog open={dialog === 'help'} onClose={closeDialog} />
-      <ShareDialog open={dialog === 'share'} onClose={closeDialog} board={board} doc={store.doc} me={me} onOpenSettings={() => setDialog('settings')} />
+      <ShareDialog open={dialog === 'share'} onClose={closeDialog} board={board} doc={store.doc} me={me} liveRoom={live?.room ?? null}
+        onStartLive={() => void startLive(newRoomCode())} onLeaveLive={leaveLive} onOpenSettings={() => setDialog('settings')} />
       <BoardsDialog
         open={dialog === 'boards'}
         onClose={closeDialog}

@@ -165,20 +165,23 @@ export function HelpDialog({ open, onClose }: { open: boolean; onClose: () => vo
 
 // ---- Share ------------------------------------------------------------------
 
-export function ShareDialog({ open, onClose, board, doc, me, onOpenSettings }: {
+export function ShareDialog({ open, onClose, board, doc, me, onOpenSettings, liveRoom, onStartLive, onLeaveLive }: {
   open: boolean; onClose: () => void; board: Board; doc: Doc; me: string | null; onOpenSettings: () => void;
+  liveRoom: string | null; onStartLive: () => void; onLeaveLive: () => void;
 }) {
   const [status, setStatus] = useState('');
   const field = useRef<HTMLTextAreaElement>(null);
+  const liveField = useRef<HTMLTextAreaElement>(null);
   const url = open ? shareUrl(doc, window.location.href) : '';
+  const liveUrl = open && liveRoom ? shareUrl(doc, window.location.href, liveRoom) : '';
   useEffect(() => setStatus(''), [open]);
 
-  async function copy() {
+  async function copy(text: string, el: HTMLTextAreaElement | null, what: string) {
     try {
-      await navigator.clipboard.writeText(url);
-      setStatus('Link copied. Paste it into your group chat.');
+      await navigator.clipboard.writeText(text);
+      setStatus(`${what} copied. Paste it into your group chat.`);
     } catch {
-      field.current?.select();
+      el?.select();
       setStatus('Couldn’t copy automatically. The link is selected: press Control C to copy it.');
     }
   }
@@ -201,10 +204,38 @@ export function ShareDialog({ open, onClose, board, doc, me, onOpenSettings }: {
           <textarea id="share-url" ref={field} readOnly value={url} rows={3} onFocus={(e) => e.currentTarget.select()} />
         </div>
         <div className="form-actions">
-          <button type="button" className="btn btn-primary" onClick={copy} data-autofocus>Copy link</button>
+          <button type="button" className="btn btn-primary" onClick={() => copy(url, field.current, 'Link')} data-autofocus>Copy link</button>
           <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
         </div>
         <p role="status" className="hint">{status}</p>
+
+        <section className="live-share" aria-labelledby="live-share-h">
+          <h3 id="live-share-h">Work on it live</h3>
+          {liveRoom ? (
+            <>
+              <p>
+                Your live session is open. Teammates who open this invite link join it, and everyone sees each other’s changes as they happen.
+                Handrail reads them out as they arrive.
+              </p>
+              <div className="field">
+                <label htmlFor="live-url">Invite link</label>
+                <textarea id="live-url" ref={liveField} readOnly value={liveUrl} rows={3} onFocus={(e) => e.currentTarget.select()} />
+              </div>
+              <div className="form-actions">
+                <button type="button" className="btn btn-primary" onClick={() => copy(liveUrl, liveField.current, 'Invite link')}>Copy invite link</button>
+                <button type="button" className="btn btn-secondary" onClick={onLeaveLive}>Leave live session</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p>
+                Prefer to see changes the moment they happen? Start a live session and send the invite link. Browsers connect to each other directly;
+                Handrail has no server and keeps nothing.
+              </p>
+              <button type="button" className="btn btn-secondary" onClick={onStartLive}>Start a live session</button>
+            </>
+          )}
+        </section>
         <p className="hint">Anyone with the link can read the board. Don’t put passwords or private information on a shared board.</p>
       </div>
     </Modal>

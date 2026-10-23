@@ -5,6 +5,7 @@ import { newId } from '../model/board';
 import { demoBoard, demoTeammateEdits } from '../model/seed';
 import { validateBoard } from '../model/validate';
 import { docFromHash } from '../model/share';
+import { covers } from '../lib/live';
 import type { Board } from '../model/types';
 
 export interface Settings {
@@ -55,6 +56,8 @@ interface State {
   saved: Saved;
   past: Entry[];
   future: Entry[];
+  /** The last batch of changes that arrived from a live session, for announcing. */
+  live: { seq: number; changes: Change[]; from: string | null };
 }
 
 type Action =
@@ -65,6 +68,7 @@ type Action =
   | { type: 'redo' }
   | { type: 'markSeen' }
   | { type: 'loadShared'; doc: Doc }
+  | { type: 'mergeLive'; doc: Doc; from: string | null }
   | { type: 'create'; board: Board }
   | { type: 'simulate' }
   | { type: 'switch'; id: string }
@@ -182,7 +186,7 @@ function write(saved: Saved, board: Board, markSeen: boolean): Saved {
 }
 
 /** Merges a teammate's copy into ours and works out what they changed since we last looked. */
-function receive(saved: Saved, remote: Doc): Saved {
+function receive(saved: Saved, remote: Doc, open = true): { saved: Saved; fresh: Change[] } {
   const local = saved.docs[remote.id];
   const merged = local ? mergeDocs(local, remote) : remote;
   const me = nameOf(saved);
@@ -197,12 +201,15 @@ function receive(saved: Saved, remote: Doc): Saved {
   const wasAcknowledged = !!saved.acknowledged[remote.id];
   const unread = fresh.length && wasAcknowledged ? fresh : [...(saved.inbox[remote.id] ?? []), ...fresh];
   return {
-    ...saved,
-    docs: { ...saved.docs, [remote.id]: merged },
-    currentId: remote.id,
-    seen: { ...saved.seen, [remote.id]: now },
-    inbox: unread.length ? { ...saved.inbox, [remote.id]: unread } : without(saved.inbox, remote.id),
-    acknowledged: fresh.length ? without(saved.acknowledged, remote.id) : saved.acknowledged,
+    fresh,
+    saved: {
+      ...saved,
+      docs: { ...saved.docs, [remote.id]: merged },
+      currentId: open ? remote.id : saved.currentId,
+      seen: { ...saved.seen, [remote.id]: now },
+      inbox: unread.length ? { ...saved.inbox, [remote.id]: unread } : without(saved.inbox, remote.id),
+      acknowledged: fresh.length ? without(saved.acknowledged, remote.id) : saved.acknowledged,
+    },
   };
 }
 
@@ -224,6 +231,7 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'apply':
       return {
+        ...state,
         saved: write(saved, action.board, true),
         past: [...state.past, { board: current, label: action.label }].slice(-HISTORY),
         future: [],
@@ -232,6 +240,7 @@ function reducer(state: State, action: Action): State {
       return { ...state, saved: write(saved, action.board, false) };
     case 'commitFrom':
       return {
+        ...state,
         saved: write(saved, current, true),
         past: [...state.past, { board: action.origin, label: action.label }].slice(-HISTORY),
         future: [],
@@ -241,6 +250,7 @@ function reducer(state: State, action: Action): State {
       if (!prev) return state;
       // Undo is a new edit that writes the old values back, so it syncs like any other change.
       return {
+        ...state,
         saved: write(saved, prev.board, true),
         past: state.past.slice(0, -1),
         future: [{ board: current, label: prev.label }, ...state.future],
@@ -250,6 +260,7 @@ function reducer(state: State, action: Action): State {
       const next = state.future[0];
       if (!next) return state;
       return {
+        ...state,
         saved: write(saved, next.board, true),
         past: [...state.past, { board: current, label: next.label }],
         future: state.future.slice(1),
@@ -263,13 +274,20 @@ function reducer(state: State, action: Action): State {
     case 'loadShared': {
       const sameBoardOpen = action.doc.id === saved.currentId;
       return {
-        saved: receive(saved, action.doc),
+        ...state,
+        saved: receive(saved, action.doc).saved,
         past: sameBoardOpen ? [...state.past, { board: current, label: 'open the shared version' }] : [],
         future: [],
       };
     }
+    case 'mergeLive': {
+      const local = saved.docs[action.doc.id];
+      if (!local || covers(local.vv, action.doc.vv)) return state;
+      const { saved: next, fresh } = receive(saved, action.doc, false);
+      return { ...state, saved: next, live: { seq: state.live.seq + 1, changes: fresh, from: action.from } };
+    }
     case 'create':
-      return { saved: created(saved, action.board), past: [], future: [] };
+      return { ...state, saved: created(saved, action.board), past: [], future: [] };
     case 'simulate': {
       // Start the sample board fresh, then let "Riya" and "Arjun" edit it on their own devices.
       const start = created(saved, demoBoard(new Date()));
@@ -277,11 +295,11 @@ function reducer(state: State, action: Action): State {
       for (const step of demoTeammateEdits(new Date())) {
         theirs = commit(theirs, step.apply(view(theirs)), step.actor, step.by);
       }
-      return { saved: receive(start, theirs), past: [], future: [] };
+      return { ...state, saved: receive(start, theirs).saved, past: [], future: [] };
     }
     case 'switch':
       if (!saved.docs[action.id] || action.id === saved.currentId) return state;
-      return { saved: { ...saved, currentId: action.id }, past: [], future: [] };
+      return { ...state, saved: { ...saved, currentId: action.id }, past: [], future: [] };
     case 'deleteBoard': {
       let next: Saved = {
         ...saved,
@@ -292,7 +310,7 @@ function reducer(state: State, action: Action): State {
       };
       if (Object.keys(next.docs).length === 0) next = created(next, demoBoard(new Date()));
       const currentId = next.docs[saved.currentId] ? saved.currentId : Object.keys(next.docs)[0];
-      return { saved: { ...next, currentId }, past: currentId === saved.currentId ? state.past : [], future: [] };
+      return { ...state, saved: { ...next, currentId }, past: currentId === saved.currentId ? state.past : [], future: [] };
     }
     case 'settings':
       return { ...state, saved: { ...saved, settings: { ...saved.settings, ...action.patch } } };
@@ -300,7 +318,7 @@ function reducer(state: State, action: Action): State {
 }
 
 export function useHandrail() {
-  const [state, dispatch] = useReducer(reducer, undefined, () => ({ saved: loadSaved(), past: [], future: [] }));
+  const [state, dispatch] = useReducer(reducer, undefined, () => ({ saved: loadSaved(), past: [], future: [], live: { seq: 0, changes: [], from: null } }));
   const { saved } = state;
 
   useEffect(() => {
@@ -336,6 +354,8 @@ export function useHandrail() {
     redo: useCallback(() => dispatch({ type: 'redo' }), []),
     markSeen: useCallback(() => dispatch({ type: 'markSeen' }), []),
     loadShared: useCallback((d: Doc) => dispatch({ type: 'loadShared', doc: d }), []),
+    mergeLive: useCallback((d: Doc, from: string | null) => dispatch({ type: 'mergeLive', doc: d, from }), []),
+    liveArrivals: state.live,
     createBoard: useCallback((b: Board) => dispatch({ type: 'create', board: b }), []),
     simulateTeammates: useCallback(() => dispatch({ type: 'simulate' }), []),
     switchBoard: useCallback((id: string) => dispatch({ type: 'switch', id }), []),

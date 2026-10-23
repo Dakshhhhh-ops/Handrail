@@ -3,7 +3,7 @@ import { addCard, deleteColumn, moveCard } from '../../src/model/board';
 import { diffBoards } from '../../src/model/diff';
 import { exportCsv, importCsv, importTrello, parseCsv, exportMarkdown } from '../../src/model/importers';
 import { demoBoard, demoTeammateUpdate } from '../../src/model/seed';
-import { boardFromHash, decodeBoard, docFromHash, encodeBoard, encodeDoc, shareUrl } from '../../src/model/share';
+import { boardFromHash, decodeBoard, docFromHash, encodeBoard, encodeDoc, parseHash, shareUrl } from '../../src/model/share';
 import { docFromBoard, materialize } from '../../src/model/crdt';
 import { validateBoard } from '../../src/model/validate';
 
@@ -44,6 +44,14 @@ describe('share links', () => {
     expect(url.startsWith('https://example.org/handrail/#board=v2.')).toBe(true);
     expect(docFromHash(new URL(url).hash)).toEqual(doc);
     expect(boardFromHash(new URL(url).hash)!.title).toBe('Climate talk: group project');
+  });
+
+  it('can carry a live-session code', () => {
+    const doc = docFromBoard(demoBoard(today), 'priya', 'Priya');
+    const url = shareUrl(doc, 'https://example.org/', 'abcd2345efgh6789wxyz');
+    expect(parseHash(new URL(url).hash)).toEqual({ data: expect.stringMatching(/^v2\./), live: 'abcd2345efgh6789wxyz' });
+    expect(docFromHash(new URL(url).hash)).toEqual(doc);
+    expect(parseHash('#board=v2.x&live=<script>')).toBeNull();
   });
 
   it('still opens old board-only links', () => {

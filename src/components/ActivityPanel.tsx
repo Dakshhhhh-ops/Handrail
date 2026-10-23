@@ -34,6 +34,34 @@ export function NamePrompt({ onSave }: { onSave: (name: string) => void }) {
   );
 }
 
+export interface LiveStatus {
+  room: string;
+  peers: { id: string; name: string | null }[];
+  error?: string;
+}
+
+/** "Live with Riya and Arjun", with a way to invite more people or leave. Not a live region: arrivals are announced separately. */
+export function LiveBar({ live, onInvite, onLeave }: { live: LiveStatus; onInvite: () => void; onLeave: () => void }) {
+  const names = live.peers.map((p) => p.name ?? 'someone without a name');
+  const text = live.error
+    ? live.error
+    : names.length
+      ? `Live with ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`}`
+      : 'Live session open. Waiting for teammates to join…';
+  return (
+    <section className={`live-bar${names.length ? ' is-connected' : ''}`} aria-labelledby="live-bar-text" data-testid="live-bar">
+      <p id="live-bar-text">
+        <span className="live-dot" aria-hidden="true" />
+        <strong>{text}</strong>
+      </p>
+      <div className="live-actions">
+        <button type="button" className="btn btn-secondary small" onClick={onInvite}>Invite</button>
+        <button type="button" className="btn btn-secondary small" onClick={onLeave}>Leave<span className="sr-only"> live session</span></button>
+      </div>
+    </section>
+  );
+}
+
 export interface HistoryEntry {
   id: number;
   who: 'you' | 'handrail';

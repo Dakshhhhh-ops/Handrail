@@ -218,8 +218,9 @@ test.describe('handoff between teammates', () => {
     await expect(cardIn(page, 'To do', 'check the citations')).toBeVisible();
     await expect(cardIn(page, 'Done', 'Design slides')).toBeVisible();
     const items = page.getByTestId('change-list').getByRole('listitem');
-    await expect(items).toHaveCount(3);
-    await expect(items.first()).toContainText(/You and Riya both changed the due date of “Email Dr\. Mehta about the extension” at the same time\. Handrail kept/);
+    // Priya's edit came later in real time, so hers is kept on every device.
+    await expect(items).toHaveCount(2);
+    await expect(items.first()).toContainText('You and Riya both changed the due date of “Email Dr. Mehta about the extension” at the same time. Handrail kept yours.');
     await expect(items.filter({ hasText: 'Riya moved “Design slides 4 to 8” from To do to Done.' })).toHaveCount(1);
   });
 
@@ -352,6 +353,42 @@ test.describe('activity panel', () => {
     await expect(items.nth(3)).toHaveClass(/msg-fail/);
     await expect(items.nth(3).locator('.status-icon.is-fail svg')).toBeVisible();
     await expect(items.nth(3)).toContainText(/Handrail: Didn’t work: I couldn.t find a card called “pizza”\./);
+  });
+});
+
+test.describe('live session (real network)', () => {
+  // Uses public Nostr relays to connect two browsers, so it needs the internet. Skipped in CI to keep deploys reliable.
+  test.skip(!!process.env.CI, 'needs the public relays');
+  test.setTimeout(90_000);
+
+  test('teammates see and hear each other’s changes as they happen', async ({ page, browser }) => {
+    await page.getByRole('button', { name: 'Share' }).click();
+    await page.getByRole('button', { name: 'Start a live session' }).click();
+    const invite = await page.getByLabel('Invite link').inputValue();
+    expect(invite).toMatch(/#board=v2\..+&live=[a-z0-9]{12,}$/);
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('live-bar')).toContainText('Waiting for teammates');
+
+    const riyaCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const riya = await riyaCtx.newPage();
+    await riya.goto(invite);
+    await riya.locator('#name-prompt-input').fill('Riya');
+    await riya.getByRole('button', { name: 'Save' }).click();
+
+    await expect(page.getByTestId('live-bar')).toContainText('Live with Riya', { timeout: 60_000 });
+    await expect(riya.getByTestId('live-bar')).toContainText('Live with Priya', { timeout: 30_000 });
+
+    await run(riya, 'move design slides to done');
+    await expect(cardIn(page, 'Done', 'Design slides')).toBeVisible({ timeout: 20_000 });
+    await expect(live(page)).toContainText('Riya moved “Design slides 4 to 8” to Done.');
+    await expect(cardIn(page, 'Done', 'Design slides').locator('.change-flag')).toHaveText('Riya · moved');
+
+    await run(page, 'email is done');
+    await expect(cardIn(riya, 'Done', 'Email Dr. Mehta')).toBeVisible({ timeout: 20_000 });
+
+    await page.getByTestId('live-bar').getByRole('button', { name: 'Leave live session' }).click();
+    await expect(riya.getByTestId('live-bar')).toContainText('Waiting for teammates', { timeout: 30_000 });
+    await riyaCtx.close();
   });
 });
 

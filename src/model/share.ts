@@ -36,14 +36,21 @@ export function decodeShared(data: string): Doc | null {
   return board ? docFromBoard(board, 'legacy', null) : null;
 }
 
-export function shareUrl(doc: Doc, base: string): string {
-  return `${base.split('#')[0]}#board=${encodeDoc(doc)}`;
+/** A link to the board. With `live`, opening it also joins that live session. */
+export function shareUrl(doc: Doc, base: string, live?: string | null): string {
+  return `${base.split('#')[0]}#board=${encodeDoc(doc)}${live ? `&live=${live}` : ''}`;
+}
+
+/** Splits "#board=v2.…&live=room" into its parts. The packed board never contains "&". */
+export function parseHash(hash: string): { data: string; live: string | null } | null {
+  const m = hash.match(/^#board=([^&]+)(?:&live=([a-z0-9]{8,40}))?$/);
+  return m ? { data: m[1], live: m[2] ?? null } : null;
 }
 
 /** Reads a board document from a location hash such as "#board=v2.…". */
 export function docFromHash(hash: string): Doc | null {
-  const m = hash.match(/^#board=(.+)$/);
-  return m ? decodeShared(m[1]) : null;
+  const p = parseHash(hash);
+  return p ? decodeShared(p.data) : null;
 }
 
 /** The board a link shows (either format). */
