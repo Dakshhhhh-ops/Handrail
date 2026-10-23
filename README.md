@@ -45,9 +45,9 @@ WCAG 2.2 covers this in [2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22
 |---|---|---|
 | ![Command box replying "Moved to Doing"](docs/command.png) | ![A picked-up card with a dashed outline and key hints](docs/keyboard.png) | ![Card action menu with Move to, Order and Card buttons](docs/menu.png) |
 
-| High contrast, 125% text | Phone, dark mode |
+| Paper theme | Phone |
 |---|---|
-| ![Board in the high-contrast theme with larger text](docs/contrast.png) | ![Board on a phone in dark mode, columns stacked](docs/phone.png) |
+| ![The board in the cream Paper theme with the night-blue Activity panel](docs/contrast.png) | ![Board on a phone, columns stacked, command box docked at the bottom](docs/phone.png) |
 
 ## How sharing works (no server)
 
