@@ -3,7 +3,7 @@ import {
 } from './board';
 import type { Command } from './commands';
 import { parseDue } from './dates';
-import { boardSummary, cardDetails, columnReport, dueReport, mineReport, positionText, whoLabel } from './describe';
+import { boardSummary, cardDetails, columnReport, dueReport, mineReport, personReport, positionText, whoLabel } from './describe';
 import { findCard, findColumn, findPerson, type MatchResult } from './match';
 import type { Board, Card, Column } from './types';
 
@@ -75,6 +75,20 @@ export function executeCommand(cmd: Command, board: Board, ctx: ExecContext): Ex
     case 'changes': return { ok: true, message: '', effect: 'changes' };
     case 'summary': return { ok: true, message: boardSummary(board, today, me) };
     case 'mine': return { ok: true, message: mineReport(board, today, me) };
+    case 'person': {
+      const who = findPerson(peopleOn(board), cmd.person, me);
+      if (!who) return { ok: false, message: `Nobody called ${quote(cmd.person)} has cards on this board. People here: ${peopleOn(board).join(', ') || 'none yet'}.` };
+      return { ok: true, message: personReport(board, who, today, me) };
+    }
+    case 'owner': {
+      const c = resolveCard(board, cmd.card);
+      if (!c.card) return { ok: false, message: c.error! };
+      return {
+        ok: true,
+        message: c.card.assignee ? `${quote(c.card.title)} is assigned to ${whoLabel(c.card.assignee, me)}.` : `Nobody has ${quote(c.card.title)} yet. Say “assign ${c.card.title.toLowerCase()} to me” to take it.`,
+        focusCardId: c.card.id,
+      };
+    }
     case 'whatsDue': return { ok: true, message: dueReport(board, cmd.range, today, me) };
 
     case 'add': {

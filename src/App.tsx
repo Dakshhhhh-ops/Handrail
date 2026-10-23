@@ -1,9 +1,10 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  addCard, addColumn, deleteCard, deleteColumn, locate, moveCard, moveColumn, peopleOn, renameBoard, renameColumn, updateCard,
+  addCard, addColumn, deleteCard, deleteColumn, doneColumn, locate, moveCard, moveColumn, peopleOn, renameBoard, renameColumn, updateCard,
 } from './model/board';
 import { parseCommand } from './model/commands';
 import { cardDetails, positionText, sameName } from './model/describe';
+import { daysUntil, describeDue } from './model/dates';
 import { executeCommand } from './model/execute';
 import { previewCommand } from './model/preview';
 import { revertEdit } from './model/revert';
@@ -18,13 +19,15 @@ import { AnnouncerProvider, useAnnounce } from './components/Announcer';
 import { BoardView } from './components/BoardView';
 import { CommandBar } from './components/CommandBar';
 import { ChangesPanel } from './components/ChangesPanel';
-import { ActivityContent, LiveBar, NamePrompt, type HistoryEntry, type LiveStatus } from './components/ActivityPanel';
+import { ActivityContent, ComingUp, LiveBar, NamePrompt, type HistoryEntry, type LiveStatus } from './components/ActivityPanel';
 import { createSession, newRoomCode, trysteroTransport, type LiveSession } from './lib/live';
 import { entrance, replay } from './lib/motion';
 import { personClass } from './components/BoardView';
 import type { Change } from './model/diff';
 import { Modal } from './components/Modal';
-import { Landing } from './components/Landing';
+// The story is only for first visits, so it loads separately and the board opens faster.
+const Landing = lazy(() => import('./components/Landing').then((m) => ({ default: m.Landing })));
+import { Blindfold } from './components/Blindfold';
 import { useMediaQuery } from './lib/useMediaQuery';
 import { CheckIcon, ChevronDownIcon, GearIcon, HelpIcon, RedoIcon, ShareIcon, UndoIcon } from './components/Icons';
 import type { ChangeKind } from './model/diff';
@@ -39,6 +42,8 @@ const STORY_SEEN = 'handrail:story-seen';
 function showStoryFirst(): boolean {
   try {
     if (window.location.hash.startsWith('#board=')) return false;
+    // A direct link to the eyes-closed challenge (for judges) goes straight to it.
+    if (new URLSearchParams(window.location.search).has('blindfold')) return false;
     if (new URLSearchParams(window.location.search).has('story')) return true;
     return !localStorage.getItem(STORY_SEEN) && !localStorage.getItem('handrail:v1');
   } catch {
@@ -62,7 +67,17 @@ export default function App() {
   }, []);
   return (
     <AnnouncerProvider speakAloud={store.settings.speak} rate={store.settings.speechRate}>
-      {story ? <Landing onEnter={enter} /> : <Shell store={store} arrived={arrived} onStory={() => { window.scrollTo(0, 0); setStory(true); }} />}
+      {story ? (
+        <Suspense fallback={<div className="landing" aria-busy="true" />}>
+        <Landing
+          onEnter={enter}
+          onChallenge={() => {
+            window.history.replaceState(null, '', '?blindfold');
+            enter();
+          }}
+        />
+        </Suspense>
+      ) : <Shell store={store} arrived={arrived} onStory={() => { window.scrollTo(0, 0); setStory(true); }} />}
     </AnnouncerProvider>
   );
 }
@@ -112,6 +127,21 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
   const historyId = useRef(0);
   const [justMine, setJustMine] = useState(false);
   const [showBefore, setShowBefore] = useState(false);
+  const [online, setOnline] = useState(() => navigator.onLine);
+  useEffect(() => {
+    const up = () => { setOnline(true); };
+    const down = () => {
+      setOnline(false);
+      announce('You are offline. Handrail keeps working and saves on this device.');
+    };
+    window.addEventListener('online', up);
+    window.addEventListener('offline', down);
+    return () => {
+      window.removeEventListener('online', up);
+      window.removeEventListener('offline', down);
+    };
+  }, [announce]);
+  const [blindfold, setBlindfold] = useState(() => new URLSearchParams(window.location.search).has('blindfold'));
   const before = store.beforeBoard;
   const viewing = showBefore && before ? before : store.board;
   // Any change to the real board (yours or a teammate's) brings you back to now.
@@ -122,6 +152,8 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
   const liveBoard = useRef<string | null>(null);
   const docRef = useRef(store.doc);
   docRef.current = store.doc;
+  const meRef = useRef(store.me);
+  meRef.current = store.me;
   const dockRef = useRef<HTMLDivElement>(null);
 
   // Keep the phone dock's height in a CSS variable so nothing hides behind it.
@@ -186,9 +218,11 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
     else delete document.documentElement.dataset.compact;
   }, [compact]);
 
+  // The tab title shows how many teammates' changes are waiting, so you notice from another tab.
+  const waiting = store.changesAcknowledged ? 0 : store.changes.length;
   useEffect(() => {
-    document.title = `${board.title} · Handrail`;
-  }, [board.title]);
+    document.title = `${waiting ? `(${waiting}) ` : ''}${board.title} · Handrail`;
+  }, [board.title, waiting]);
 
   // ---- Opening a shared link ------------------------------------------------
   useEffect(() => {
@@ -259,6 +293,8 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
           setLive((l) => (l ? { ...l, peers } : l));
         },
       }, store.actor, 150);
+      // The name may have been entered while connecting (e.g. a teammate who just opened the invite).
+      if (meRef.current) session.current.setName(meRef.current);
       announce('Live session open. Teammates who open the invite link will join, and their changes will be read out as they arrive.');
     } catch {
       setLive({ room, peers: [], error: 'Couldn’t start a live session. Check your connection; share links still work.' });
@@ -555,6 +591,31 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
     </button>
   );
 
+  // Your own deadlines: overdue, today or tomorrow, not yet done.
+  const doneCol = doneColumn(board);
+  const upcomingItems = me
+    ? board.columns
+        .filter((c) => c.id !== doneCol?.id)
+        .flatMap((c) => c.cardIds.map((id) => board.cards[id]))
+        .filter((k) => k.due && sameName(k.assignee, me) && daysUntil(k.due, today) <= 1)
+        .sort((a, b) => (a.due! < b.due! ? -1 : 1))
+        .map((k) => {
+          const d = describeDue(k.due!, today);
+          return { id: k.id, title: k.title, when: d.status === 'overdue' ? d.spoken.split(',')[0] : d.status === 'today' ? 'due today' : 'due tomorrow', overdue: d.status === 'overdue' };
+        })
+    : [];
+  const upcomingPanel = (
+    <ComingUp
+      items={upcomingItems}
+      onGoTo={(id) => {
+        setActivityOpen(false);
+        if (visible && !visible(id)) setJustMine(false);
+        focusCardLater(id);
+        setHighlightId(id);
+      }}
+    />
+  );
+
   const changesPanel = (
     <>
     {live && <LiveBar live={live} onInvite={() => openDialog('share')} onLeave={leaveLive} />}
@@ -616,7 +677,7 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
           </button>
           <span className={`status-pill${live ? ' is-live' : ''}`}>
             <span className="dot" aria-hidden="true" />
-            {live ? (live.peers.length ? `Live with ${live.peers.length} ${live.peers.length === 1 ? 'teammate' : 'teammates'}` : 'Live session open') : 'Saved on this device'}
+            {live ? (live.peers.length ? `Live with ${live.peers.length} ${live.peers.length === 1 ? 'teammate' : 'teammates'}` : 'Live session open') : online ? 'Saved on this device' : 'Offline · everything still works'}
           </span>
         </div>
         <nav aria-label="Board tools" className="toolbar">
@@ -693,7 +754,7 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
       </div>
       {wide && (
         <aside className="activity" id="activity" aria-labelledby="activity-h">
-          <ActivityContent changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} preview={previewText} />} />
+          <ActivityContent upcoming={upcomingPanel} changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} preview={previewText} />} />
         </aside>
       )}
       </div>
@@ -710,7 +771,7 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
       )}
       {!wide && (
         <Modal open={activityOpen} onClose={closeActivity} title="Activity" full testId="activity-dialog">
-          <ActivityContent headless changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} preview={previewText} />} />
+          <ActivityContent headless upcoming={upcomingPanel} changes={changesPanel} history={history} commandBar={<CommandBar onRun={runCommand} preview={previewText} />} />
         </Modal>
       )}
 
@@ -764,7 +825,20 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
         }}
       />
       <SettingsDialog open={dialog === 'settings'} onClose={closeDialog} settings={settings} onChange={store.updateSettings} />
-      <HelpDialog open={dialog === 'help'} onClose={closeDialog} />
+      <HelpDialog open={dialog === 'help'} onClose={closeDialog} onChallenge={() => { setDialog(null); setBlindfold(true); }} />
+      <Blindfold
+        open={blindfold}
+        onClose={() => {
+          setBlindfold(false);
+          const u = new URL(window.location.href);
+          if (u.searchParams.has('blindfold')) {
+            u.searchParams.delete('blindfold');
+            window.history.replaceState(null, '', u.pathname + u.search + u.hash);
+          }
+        }}
+        store={store}
+        onSimulate={simulateTeammates}
+      />
       <ShareDialog open={dialog === 'share'} onClose={closeDialog} board={board} doc={store.doc} me={me} liveRoom={live?.room ?? null}
         onStartLive={() => void startLive(newRoomCode())} onLeaveLive={leaveLive} onOpenSettings={() => setDialog('settings')} />
       <BoardsDialog

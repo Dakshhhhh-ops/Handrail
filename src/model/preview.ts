@@ -81,6 +81,12 @@ export function previewCommand(cmd: Command, board: Board, ctx: { today: Date; m
         text: { overdue: 'List overdue cards', today: 'List cards due today or overdue', tomorrow: 'List cards due tomorrow', week: 'List cards due in the next 7 days', all: 'List cards with a due date' }[cmd.range],
         ok: true,
       };
+    case 'person': {
+      const who = findPerson(peopleOn(board), cmd.person, ctx.me);
+      return who ? { text: `List ${whoLabel(who, ctx.me) === 'you' ? 'your' : `${who}’s`} open cards`, ok: true } : { text: `Nobody called ${q(cmd.person)} on this board`, ok: false };
+    }
+    case 'owner':
+      return withCard(cmd.card, (t) => `Say who has ${q(t)}`);
     case 'mine':
       return { text: 'List your open cards', ok: true };
     case 'summary':

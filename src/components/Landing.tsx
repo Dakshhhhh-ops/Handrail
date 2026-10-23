@@ -54,7 +54,7 @@ const SCENES = [
   { id: 'start', label: 'Start' },
 ];
 
-export function Landing({ onEnter }: { onEnter: () => void }) {
+export function Landing({ onEnter, onChallenge }: { onEnter: () => void; onChallenge: () => void }) {
   const root = useRef<HTMLDivElement>(null);
   const [paused, setPaused] = useState(false);
   const [active, setActive] = useState(0);
@@ -289,6 +289,11 @@ export function Landing({ onEnter }: { onEnter: () => void }) {
               Handrail tells you in plain words what your teammates changed since you last looked, with what involves you first. It works without dragging,
               without a mouse and without seeing the screen.
             </p>
+            <div className="hero-actions">
+              <button type="button" className="btn btn-secondary big" onClick={onChallenge}>
+                Try it with your eyes closed
+              </button>
+            </div>
             <p className="scroll-hint" aria-hidden="true">Scroll to see how ↓</p>
           </section>
 

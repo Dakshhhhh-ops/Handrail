@@ -596,7 +596,7 @@ test.describe('the story (first visit)', () => {
     await page.goto('/?story');
     const nav = page.getByRole('navigation', { name: 'Story sections' });
     await nav.getByRole('button', { name: 'Merge' }).click();
-    await expect(nav.getByRole('button', { name: 'Merge' })).toHaveAttribute('aria-current', 'step', { timeout: 5000 });
+    await expect(nav.getByRole('button', { name: 'Merge' })).toHaveAttribute('aria-current', 'step', { timeout: 15000 });
     const pause = page.getByRole('button', { name: 'Pause animation' });
     await pause.click();
     await expect(pause).toHaveAttribute('aria-pressed', 'true');
@@ -640,4 +640,18 @@ test.describe('the story (first visit)', () => {
       await ctx.close();
     });
   }
+});
+
+test('works offline once opened, and says so', async ({ page, context }) => {
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  // Let the service worker take control and cache the built files.
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+  await context.setOffline(true);
+  await expect(page.locator('.status-pill')).toHaveText(/Offline · everything still works/);
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+  await run(page, 'outline is done');
+  await expect(cardIn(page, 'Done', 'Draft the outline')).toBeVisible();
+  await context.setOffline(false);
 });

@@ -902,3 +902,10 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 .before-banner p { margin: 0; }
 .board-wrap.is-before .card { border-style: dashed; filter: saturate(0.6); }
 .board-wrap.is-before .column { border-style: dashed; }
+
+/* ---- Coming up for you (night panel) --------------------------------------------------- */
+.coming-up h3 { font-family: var(--display); font-weight: 800; font-size: 1.15rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.coming-up ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.coming-up li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.25rem 0.5rem; padding: 0.4rem 0.7rem; border-radius: 12px; border: 1.5px solid var(--border); }
+.coming-up li.is-overdue { border-color: var(--danger); }
+.coming-up li.is-overdue span { color: var(--danger); }

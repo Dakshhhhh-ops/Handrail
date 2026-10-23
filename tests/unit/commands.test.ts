@@ -117,6 +117,17 @@ describe('executeCommand', () => {
     expect(run('summary').message).toContain('To do: 4 cards. Doing: 1 card, 1 overdue. Done: 2 cards');
   });
 
+  it('answers who has a card and what someone is doing', () => {
+    expect(parse("what's Riya doing")).toEqual({ type: 'person', person: 'Riya' });
+    expect(parse('what is arjun working on')).toEqual({ type: 'person', person: 'arjun' });
+    expect(parse('who has the slides')).toEqual({ type: 'owner', card: 'the slides' });
+    expect(parse('what is in doing')).toEqual({ type: 'read', target: 'doing' });
+    expect(run("what's riya doing").message).toBe('Riya has 1 open card. Design slides 4 to 8, in To do, due Sunday 25 October, in 3 days.');
+    expect(run('who has the slides').message).toBe('“Design slides 4 to 8” is assigned to Riya.');
+    expect(run('who has the email').message).toContain('Nobody has “Email Dr. Mehta about the extension” yet.');
+    expect(run('what is zoe doing').ok).toBe(false);
+  });
+
   it('deletes and suggests undo', () => {
     const r = run('delete set up the group chat');
     expect(r.board!.cards['k-groupchat']).toBeUndefined();

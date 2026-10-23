@@ -18,6 +18,8 @@ export type Command =
   | { type: 'readCard'; card: string }
   | { type: 'whatsDue'; range: DueRange }
   | { type: 'mine' }
+  | { type: 'person'; person: string }
+  | { type: 'owner'; card: string }
   | { type: 'summary' }
   | { type: 'changes' }
   | { type: 'undo' }
@@ -112,6 +114,14 @@ export function parseCommand(raw: string, ctx: ParseContext): Command {
     return { type: 'changes' };
   if (/^(what'?s|what is|whats|show|list|read)? ?(mine|my (cards|tasks|stuff|work)|assigned to me|what do i have|what am i doing)$/.test(t))
     return { type: 'mine' };
+
+  let p = orig.match(/^(?:what(?:'s| is)|whats|show(?: me)?|list)\s+(.+?)(?:'s)?\s+(?:doing|working on|cards|tasks|work)$/i)
+    ?? orig.match(/^what (?:does|has) (.+?) (?:have|got|own)$/i)
+    ?? orig.match(/^(?:cards|tasks) (?:for|of) (.+)$/i);
+  if (p && !/^(i|me|my)$/i.test(p[1].trim()) && !/^(in|the|on|at)/i.test(p[1].trim()) && !ctx.isColumn(p[1]))
+    return { type: 'person', person: clean(p[1]) };
+  p = orig.match(/^(?:who(?:'s| is)? (?:has|owns|on|doing|working on)|who has|who owns|whose is) (.+)$/i);
+  if (p) return { type: 'owner', card: clean(p[1]) };
 
   let m = t.match(/^(?:what'?s|what is|whats|show|list|read|anything)?\s*(overdue|late)(?: cards| tasks)?$/);
   if (m) return { type: 'whatsDue', range: 'overdue' };

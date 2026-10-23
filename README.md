@@ -2,7 +2,10 @@
 
 **A project board that tells you what changed, so you never have to hunt for it, with or without sight.**
 
-**Try it:** https://dakshhhhh-ops.github.io/Handrail/ (no account; it opens with a sample group project. Click the board name and choose *Simulate teammates' changes* to see the main feature.)
+**Try it:** https://dakshhhhh-ops.github.io/Handrail/. It needs no account and opens with a short scroll story, then a sample group project.
+
+- **Try it with your eyes closed:** https://dakshhhhh-ops.github.io/Handrail/?blindfold. The screen goes dark and Handrail talks you through finding what changed and moving a card, by keyboard only. It takes about a minute and is timed.
+- **See the main feature:** click the board name and choose *Simulate teammates' changes*. Then try **Show me on the board** and **Before / now**.
 
 ![The board with an Activity panel listing four changes since you last looked, one marked "for you", and the changed cards tagged on the board](docs/changes.png)
 
@@ -31,6 +34,7 @@ WCAG 2.2 covers this in [2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22
 | Reading every card to find deadlines | Ask **"what's due this week"**, **"anything overdue"** or **"my tasks"**, or press **Just mine** to see only your cards and the changes that involve you |
 | Fiddly date pickers | Type **"due next friday"**, **"in 3 days"** or **"oct 30"** |
 | Hoping you didn't break something | **Undo** any change with Ctrl+Z, the Undo button, or by saying "undo" |
+| Spotting what moved by eye | **Before / now** flips the board to how it looked when you last saw it; flip back and every changed card glides to its new place. **Show me on the board** sends each teammate's name-tagged cursor to the cards they changed |
 
 ### Built for many ways of working
 
@@ -39,6 +43,8 @@ WCAG 2.2 covers this in [2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22
 - **Voice:** a Speak button, in browsers with speech recognition (Chrome, Edge). Card-name matching tolerates recognition slips: "lab raport" still finds "Lab report".
 - **Low vision and dyslexia:** high-contrast theme, text up to 200%, Atkinson Hyperlegible or OpenDyslexic fonts, relaxed spacing, a stacked layout for screen magnifiers, and replies read aloud for people who don't use a screen reader.
 - **Mouse users:** normal drag-and-drop still works, so mixed groups can share one board.
+- **Motion with a purpose:** cards glide when they move (so sighted teammates see what changed), tilt in 3D under the mouse, and the first visit is a scroll-driven story with a 3D board (GSAP, ScrollTrigger, Lenis). All of it turns off with the system's reduced-motion setting or Handrail's own "Turn off animations", and the story has a Pause button.
+- **Works offline and installs like an app:** a service worker keeps a copy, so once opened Handrail works without a connection.
 - **Groups already on Trello:** import a Trello JSON export or a CSV. Export as a backup, CSV or plain text.
 
 | Command box | Keyboard pick-up | Action menu instead of dragging |
@@ -78,8 +84,8 @@ To try it without two devices, click the board name, then choose **Simulate team
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm test             # 113 unit and property-based tests
-npm run test:e2e     # 40 browser tests, including the axe accessibility audit
+npm test             # 118 unit and property-based tests
+npm run test:e2e     # 54 browser tests, including the axe accessibility audit
 npm run build        # static site in dist/
 ```
 
@@ -113,7 +119,7 @@ flowchart LR
   - Size caps, and a bounded decompressor so a tiny link can't expand into gigabytes.
   - Names reserved by JavaScript objects are rejected.
   - Clocks and version vectors are derived from the writes themselves, and implausible clocks are refused.
-- **Testing:** 113 Vitest tests and 40 Playwright tests.
+- **Testing:** 118 Vitest tests and 54 Playwright tests.
   - Property-based tests (fast-check) generate hundreds of random three-person edit-and-swap histories and check that everyone ends up with the same, well-formed board.
   - Browser tests cover two people merging concurrent edits, keyboard-only use, and a real two-browser live session.
   - **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog, phone width and 200% text, with zero violations.

@@ -107,9 +107,39 @@ function History({ entries }: { entries: HistoryEntry[] }) {
  * The right-hand panel on wide screens (and a full-screen dialog on phones):
  * what changed, the command history, and the command box pinned at the bottom.
  */
+export interface UpcomingItem {
+  id: string;
+  title: string;
+  when: string;
+  overdue: boolean;
+}
+
+/** Your own cards that are overdue or due in the next day, so deadlines sit next to what changed. */
+export function ComingUp({ items, onGoTo }: { items: UpcomingItem[]; onGoTo: (id: string) => void }) {
+  if (items.length === 0) return null;
+  return (
+    <section className="coming-up" aria-labelledby="coming-up-h">
+      <h3 id="coming-up-h">Coming up for you</h3>
+      <ul>
+        {items.map((it) => (
+          <li key={it.id} className={it.overdue ? 'is-overdue' : undefined}>
+            <span>
+              <strong>{it.title}</strong> · {it.when}
+            </span>
+            <button type="button" className="btn btn-quiet small" onClick={() => onGoTo(it.id)}>
+              Go to card<span className="sr-only">: {it.title}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function ActivityContent({
-  changes, history, commandBar, headless = false,
+  changes, history, commandBar, headless = false, upcoming,
 }: {
+  upcoming?: ReactNode;
   changes: ReactNode;
   history: HistoryEntry[];
   commandBar: ReactNode;
@@ -124,6 +154,7 @@ export function ActivityContent({
       )}
       <div className="activity-scroll" tabIndex={0} role="region" aria-label="Changes and command history" onFocus={revealFocus}>
         {changes}
+        {upcoming}
         <History entries={history} />
       </div>
       <div className="activity-input">{commandBar}</div>

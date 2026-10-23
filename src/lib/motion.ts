@@ -117,7 +117,8 @@ let replaying = false;
 
 /** Animates one name-tagged cursor per change, in turn, from the Activity panel to the card. */
 export async function replay(steps: ReplayStep[]): Promise<void> {
-  if (replaying || !steps.length) return;
+  // Nothing to show while the screen is off (the eyes-closed challenge).
+  if (replaying || !steps.length || document.documentElement.classList.contains('bf-on')) return;
   replaying = true;
   const layer = document.createElement('div');
   layer.className = 'cursor-layer';

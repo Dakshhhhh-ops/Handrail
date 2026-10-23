@@ -92,6 +92,19 @@ export function dueReport(board: Board, range: DueRange, today: Date, me: string
   return `${plural(cards.length, 'card')} ${label}. ${items.join(' ')}`;
 }
 
+/** "Riya has 2 open cards: …" */
+export function personReport(board: Board, person: string, today: Date, me: string | null): string {
+  if (sameName(person, me)) return mineReport(board, today, me);
+  const cards = openCards(board).filter((k) => sameName(k.assignee, person));
+  if (cards.length === 0) return `Nothing open is assigned to ${person}.`;
+  const items = cards.map((k) => {
+    const where = locate(board, k.id)?.column.title ?? '';
+    const due = k.due ? `, ${describeDue(k.due, today).spoken}` : '';
+    return `${k.title}, in ${where}${due}.`;
+  });
+  return `${person} has ${plural(cards.length, 'open card')}. ${items.join(' ')}`;
+}
+
 export function mineReport(board: Board, today: Date, me: string | null): string {
   if (!me) return 'Set your name in Settings first, so Handrail knows which cards are yours.';
   const cards = openCards(board).filter((k) => sameName(k.assignee, me));

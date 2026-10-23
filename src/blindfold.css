@@ -1,0 +1,54 @@
+/* "Try it with your eyes closed" challenge. The app stays usable underneath; it is only hidden from sight. */
+
+html.bf-on #root > *,
+html.bf-on dialog { opacity: 0 !important; }
+html.bf-on dialog::backdrop { background: transparent !important; }
+
+.bf-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2rem;
+  padding: clamp(1rem, 5vw, 4rem);
+  background: #000;
+  color: #f5f3ee;
+  /* Blocks the mouse on purpose: the challenge is keyboard only. */
+  pointer-events: auto;
+  cursor: none;
+}
+.bf-top { position: absolute; top: 1rem; left: 1rem; right: 1rem; display: flex; justify-content: space-between; font-weight: 700; letter-spacing: 0.04em; }
+.bf-rec { color: #ff8a80; }
+.bf-clock { font-variant-numeric: tabular-nums; font-size: 1.25rem; }
+.bf-caption {
+  margin: 0;
+  max-width: 46rem;
+  font-size: clamp(1.4rem, 3.4vw, 2.4rem);
+  line-height: 1.35;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.bf-focus { margin: 0; max-width: 46rem; font-size: clamp(1.05rem, 2vw, 1.35rem); color: #b9d6ff; overflow-wrap: anywhere; }
+.bf-focus-label { display: inline-block; margin-right: 0.5rem; padding: 0.05rem 0.5rem; border: 1px solid currentColor; border-radius: 6px; font-size: 0.8em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.bf-progress { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; font-size: 1.1rem; color: #b8b5ad; }
+.bf-progress .is-now { color: #ffe600; font-weight: 700; }
+.bf-progress .is-done { color: #5ad0b9; }
+.bf-tick { display: inline-block; width: 1.4em; }
+.bf-foot { margin: 0; color: #b8b5ad; font-size: 0.95rem; }
+
+/* The only control on top of the dark screen. Not hidden from assistive technology. */
+.bf-stop { position: fixed; right: 1rem; bottom: 1rem; z-index: 2147483001; }
+.bf-stop .btn { background: #1b1f1e; color: #f5f3ee; border-color: #7d857f; }
+.bf-stop .btn:focus-visible { outline: 3px solid #ffe600; outline-offset: 2px; }
+
+.bf-intro { display: flex; flex-direction: column; gap: 0.9rem; }
+.bf-intro p { margin: 0; }
+.bf-steps { margin: 0; padding-left: 1.4rem; display: flex; flex-direction: column; gap: 0.3rem; font-weight: 700; }
+.bf-big { font-size: 1.4rem; font-weight: 800; }
+
+@media (prefers-reduced-motion: no-preference) {
+  :root:not([data-motion='reduce']) .bf-caption { animation: bf-in 0.25s ease-out; }
+}
+@keyframes bf-in { from { opacity: 0; transform: translateY(6px); } }

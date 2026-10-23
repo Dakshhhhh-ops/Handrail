@@ -13,6 +13,11 @@ import './styles.css';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
+// Works offline once it has been opened: the service worker keeps a copy of the app.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>

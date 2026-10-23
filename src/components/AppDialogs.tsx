@@ -119,17 +119,21 @@ const SAYINGS: [string, string][] = [
   ['note on slides: use the uni template', 'Add a note'],
   ['what changed · catch me up', 'Hear what teammates changed'],
   ['what’s due this week · anything overdue · my tasks', 'Ask questions'],
+  ['what is Riya doing · who has the slides', 'Ask about people and cards'],
   ['read doing · summary', 'Hear a column or the whole board'],
   ['undo · redo', 'Take back the last change'],
 ];
 
-export function HelpDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function HelpDialog({ open, onClose, onChallenge }: { open: boolean; onClose: () => void; onChallenge: () => void }) {
   return (
     <Modal open={open} onClose={onClose} title="How to use Handrail" wide testId="help">
       <div className="help">
         <p className="help-intro">
           Handrail tells you what your teammates changed, so you never have to hunt for it. Everything else works by keyboard, by menu, or by typing or saying a sentence.
         </p>
+        <div>
+          <button type="button" className="btn btn-primary" onClick={onChallenge}>Try it with your eyes closed</button>
+        </div>
         <section aria-labelledby="h-say">
           <h3 id="h-say">Things you can type or say</h3>
           <table className="table">
