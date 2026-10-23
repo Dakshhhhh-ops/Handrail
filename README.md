@@ -51,13 +51,15 @@ WCAG 2.2 covers this in [2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22
 
 ## How sharing works (no server)
 
-Handrail has no backend and no accounts. **Share** packs the whole board into a compressed link (`#board=…`). The part after `#` is never sent to a web server.
+Handrail has no backend and no accounts. Every board is a **conflict-free replicated document (CRDT)**, so copies can be edited separately and merged later without losing anyone's work.
 
-1. Priya shares the link in the group chat.
-2. Riya opens it, makes changes, and shares her link back.
-3. Priya opens Riya's link. Handrail compares it with the version Priya last saw and turns every difference into a sentence, naming who made it. It moves focus to that list and announces how many changes there are.
+1. Priya presses **Share** and sends the link in the group chat. The whole board is packed into the part after `#`, which never reaches a web server.
+2. Riya opens it, makes changes, and sends her link back, possibly while Priya kept editing too.
+3. Priya opens Riya's link. Handrail **merges** it into her copy, then writes what changed since she last looked as a short digest ("Riya gave you 'Email Dr. Mehta', moved 'Design slides' to Done…"). Each change is credited to the person who made that exact edit. If they changed the same thing at the same time, it says so and which version it kept.
 
-To see it without two devices, click the board name to open the board menu, then choose **Simulate teammates' changes**.
+**Live sessions** do the same thing continuously. Start one from Share and send the invite link: browsers find each other through public Nostr relays and then connect directly over WebRTC. Every edit is merged on arrival and read aloud as it happens.
+
+To try it without two devices, click the board name, then choose **Simulate teammates' changes**.
 
 ## Keyboard
 
@@ -76,29 +78,52 @@ To see it without two devices, click the board name to open the board menu, then
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm test             # 68 unit tests (parser, previews, dates, change detection, imports)
-npm run test:e2e     # 31 browser tests incl. axe accessibility audit
+npm test             # 113 unit and property-based tests
+npm run test:e2e     # 40 browser tests, including the axe accessibility audit
 npm run build        # static site in dist/
 ```
 
-Every push to `main` runs type-checking, both test suites, and then deploys to GitHub Pages ([workflow](.github/workflows/deploy.yml)).
+Every push to `main` runs type-checking and both test suites, then deploys to GitHub Pages ([workflow](.github/workflows/deploy.yml)).
 
 ## How it's built
 
-- **React 18 + TypeScript + Vite**, a static site with no backend.
-- `src/model/` is plain TypeScript with no UI code, so it is unit-tested:
-  - `commands.ts` reads plain-language commands with no AI service. It's offline, instant, private and predictable. It handles card titles that themselves contain "to" or "for" by only treating a trailing clause as a column or person when one with that name exists.
-  - `match.ts` matches card and column names with fuzzy scoring and edit distance. Columns also match by synonym ("finished" means Done) or number. When two cards match equally well, it asks which one instead of guessing.
-  - `dates.ts` handles everyday dates ("next friday", "the 30th", "in two weeks").
-  - `diff.ts` compares two versions of a board and describes each change as a sentence, with changes that involve you first.
-  - `validate.ts` treats every shared link, imported file and saved board as untrusted: it limits sizes, fixes ids and drops broken cards.
-- **Testing:** Vitest (68 tests) and Playwright (31 tests), including a two-person handoff test that uses two separate browser contexts. **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog, and phone width, with zero violations.
+```mermaid
+flowchart LR
+  UI["Board UI<br/>keyboard · menus · drag"] -- "edited view" --> commit
+  CMD["Command box<br/>typed or spoken"] --> parse["parseCommand<br/>+ preview"] --> commit
+  commit["commit()<br/>view → register writes"] --> DOC[("CRDT document<br/>LWW registers +<br/>fractional keys")]
+  DOC --> mat["materialize()"] --> UI
+  LINK["Share link<br/>#board=…"] -- "validate · merge" --> DOC
+  LIVE["Live session<br/>WebRTC peers"] <-- "merge · publish" --> DOC
+  DOC -- "seen vs now" --> DIFF["diff + conflicts"] --> SUM["digest:<br/>“Riya moved 2 cards…”"] --> SR["Activity panel<br/>+ screen reader"]
+```
+
+- **React 18 + TypeScript + Vite**, a static site with no backend. `src/model/` is plain TypeScript with no UI code, so it is unit-tested.
+- **CRDT document** (`crdt.ts`). Every field is a last-writer-wins register holding the value, a Lamport clock, the wall-clock time, the writing device and the writer's name. Merging keeps the winning write per register, ordered by (clock, time, device, value). That merge is commutative, associative and idempotent, so copies converge whatever order links arrive in.
+  - Card order uses **fractional indexing** (copied from rocicorp/fractional-indexing, the approach Figma and Linear describe). A commit keeps the keys of the longest increasing run of cards that didn't move, so a move rewrites one register.
+  - `findConflicts` spots fields two people changed without seeing each other's write, so the app can explain what it kept.
+- **Per-action undo** (`revert.ts`). Undo puts back only what your action changed, and only where the board still shows your result, so it never wipes out a teammate's edits that merged in since.
+- **The digest** (`diff.ts`, `summary.ts`). It compares the board you last saw with the merged one, credits each change from the register's author, and folds the changes into short sentences grouped by person, with what involves you first.
+- **Live sync** (`lib/live.ts`). Trystero over Nostr relays, loaded only when a session starts. The protocol is: say hello, send your document when someone joins, and send it again after each of your own edits (debounced). Version vectors stop echoes.
+- **Plain-language commands** (`commands.ts`, `match.ts`, `dates.ts`, `preview.ts`). A deterministic parser with no AI service: offline, instant, private and predictable.
+  - Fuzzy matching tolerates speech-recognition slips ("lab raport").
+  - When two cards match equally well, it asks which one instead of guessing.
+  - It shows what a command will do before it runs.
+- **Untrusted input.** Links, live messages and files are validated:
+  - Size caps, and a bounded decompressor so a tiny link can't expand into gigabytes.
+  - Names reserved by JavaScript objects are rejected.
+  - Clocks and version vectors are derived from the writes themselves, and implausible clocks are refused.
+- **Testing:** 113 Vitest tests and 40 Playwright tests.
+  - Property-based tests (fast-check) generate hundreds of random three-person edit-and-swap histories and check that everyone ends up with the same, well-formed board.
+  - Browser tests cover two people merging concurrent edits, keyboard-only use, and a real two-browser live session.
+  - **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog, phone width and 200% text, with zero violations.
 
 ## Limitations
 
 - **Not yet tested with blind or motor-impaired users.** The design follows WCAG 2.2, the WAI-ARIA Authoring Practices and published guidance on accessible drag-and-drop, and the automated audit passes. That is not the same as real users saying it works. The next step is sessions with screen-reader users.
 - **Screen readers in browse mode** pass single-letter keys to the screen reader instead of the page. Enter on a card (action menu) and the command box always work. Help explains this.
-- **Sharing is by link, not live sync.** If two people edit at the same time, opening one person's link replaces your copy (you can undo). A small sync server is the obvious next step.
+- **Live sessions need both people online at once**, and use public relays to connect. Some strict school or office networks block peer-to-peer connections; share links still work there. There is no always-on sync server, so a teammate who is offline catches up when they open a newer link.
+- **Merging picks a winner per field.** If two people edit the same field at the same moment, one version is kept (the later one) and the other person is told; the text isn't combined.
 - **Voice input** depends on the browser's speech recognition (Chrome and Edge, online). Typing commands works everywhere.
 - **English only** for commands and dates.
 
