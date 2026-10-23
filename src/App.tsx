@@ -672,9 +672,6 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
             <svg viewBox="0 0 32 32" width="28" height="28"><rect x="3" y="5" width="7" height="22" rx="2" /><rect x="12.5" y="5" width="7" height="14" rx="2" /><rect x="22" y="5" width="7" height="18" rx="2" /><path d="M2 28.5h28" strokeWidth="2.4" strokeLinecap="round" /></svg>
           </span>
           <span className="brand-name">Handrail</span>
-          <button type="button" className="btn btn-quiet small story-link" onClick={onStory}>
-            Watch the story
-          </button>
           <span className={`status-pill${live ? ' is-live' : ''}`}>
             <span className="dot" aria-hidden="true" />
             {live ? (live.peers.length ? `Live with ${live.peers.length} ${live.peers.length === 1 ? 'teammate' : 'teammates'}` : 'Live session open') : online ? 'Saved on this device' : 'Offline · everything still works'}
@@ -825,7 +822,7 @@ function Shell({ store, onStory, arrived }: { store: Handrail; onStory: () => vo
         }}
       />
       <SettingsDialog open={dialog === 'settings'} onClose={closeDialog} settings={settings} onChange={store.updateSettings} />
-      <HelpDialog open={dialog === 'help'} onClose={closeDialog} onChallenge={() => { setDialog(null); setBlindfold(true); }} />
+      <HelpDialog open={dialog === 'help'} onClose={closeDialog} onChallenge={() => { setDialog(null); setBlindfold(true); }} onStory={() => { setDialog(null); onStory(); }} />
       <Blindfold
         open={blindfold}
         onClose={() => {

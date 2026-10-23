@@ -572,6 +572,7 @@ test.describe('the story (first visit)', () => {
     await page.reload();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
     // And the story is one click away.
+    await page.getByRole('button', { name: 'Help' }).click();
     await page.getByRole('button', { name: 'Watch the story' }).click();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Never hunt/);
     await ctx.close();

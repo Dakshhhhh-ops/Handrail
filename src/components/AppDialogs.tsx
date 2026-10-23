@@ -124,15 +124,16 @@ const SAYINGS: [string, string][] = [
   ['undo · redo', 'Take back the last change'],
 ];
 
-export function HelpDialog({ open, onClose, onChallenge }: { open: boolean; onClose: () => void; onChallenge: () => void }) {
+export function HelpDialog({ open, onClose, onChallenge, onStory }: { open: boolean; onClose: () => void; onChallenge: () => void; onStory: () => void }) {
   return (
     <Modal open={open} onClose={onClose} title="How to use Handrail" wide testId="help">
       <div className="help">
         <p className="help-intro">
           Handrail tells you what your teammates changed, so you never have to hunt for it. Everything else works by keyboard, by menu, or by typing or saying a sentence.
         </p>
-        <div>
+        <div className="action-list">
           <button type="button" className="btn btn-primary" onClick={onChallenge}>Try it with your eyes closed</button>
+          <button type="button" className="btn btn-secondary" onClick={onStory}>Watch the story</button>
         </div>
         <section aria-labelledby="h-say">
           <h3 id="h-say">Things you can type or say</h3>
@@ -157,6 +158,7 @@ export function HelpDialog({ open, onClose, onChallenge }: { open: boolean; onCl
           <p>
             Handrail has no accounts and keeps your boards on this device. To work with others, press <strong>Share</strong> and send the link.
             When a teammate sends you their link back, open it: Handrail lists every change they made since you last looked, starting with the ones that involve you.
+            In Activity, <strong>Show me on the board</strong> points at each changed card, and <strong>Before / now</strong> flips the board to how it looked before, so you can compare.
           </p>
           <p>
             Your group already uses Trello? Export the board from Trello as JSON and import it under <strong>Boards &amp; files</strong>.
