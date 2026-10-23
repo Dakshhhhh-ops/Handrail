@@ -91,6 +91,29 @@ describe('CRDT document', () => {
     expect(changed).toEqual(['k-script']);
   });
 
+  it('moving a card down one place rewrites that card, not its neighbour', () => {
+    const base = docFromBoard(demoBoard(today), 'seed', null, 1);
+    // Priya moves "sources" below "slides"; meanwhile Riya moves "slides" to Done.
+    const priya = commit(base, moveCard(materialize(base), 'k-sources', 'c-todo', 1, 'Priya'), 'priya', 'Priya', 2);
+    expect(Object.keys(priya.cards).filter((id) => priya.cards[id] !== base.cards[id])).toEqual(['k-sources']);
+    const riya = commit(base, moveCard(materialize(base), 'k-slides', 'c-done', 0, 'Riya'), 'riya', 'Riya', 3);
+    const merged = materialize(mergeDocs(priya, riya));
+    expect(merged.columns[2].cardIds[0]).toBe('k-slides');
+    expect(merged.columns[0].cardIds.slice(0, 2)).toEqual(['k-sources', 'k-email']);
+  });
+
+  it('keeps keys short when cards are swapped over and over', () => {
+    let doc = docFromBoard(demoBoard(today), 'priya', 'Priya');
+    for (let i = 0; i < 400; i++) {
+      const v = materialize(doc);
+      const second = v.columns[0].cardIds[1];
+      doc = commit(doc, moveCard(v, second, 'c-todo', 2, 'Priya'), 'priya', 'Priya');
+    }
+    const longest = Math.max(...Object.values(doc.cards).map((c) => c.place.v.pos.length));
+    expect(validateDoc(JSON.parse(JSON.stringify(doc)))!.cards['k-email']).toBeDefined();
+    expect(longest).toBeLessThan(400);
+  });
+
   it('does nothing when nothing changed', () => {
     const doc = docFromBoard(demoBoard(today), 'priya', 'Priya');
     expect(commit(doc, materialize(doc), 'priya', 'Priya')).toBe(doc);

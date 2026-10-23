@@ -16,7 +16,7 @@
  * turns a document into a view, and `commit` turns an edited view back into the
  * smallest set of register writes.
  */
-import { generateKeyBetween } from 'fractional-indexing';
+import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
 import { isISODate } from './dates';
 import type { Board, Card, Column } from './types';
 
@@ -204,25 +204,28 @@ export function lisIndices(keys: (string | null)[]): Set<number> {
 }
 
 /**
- * Gives every item in `order` a sort key. Items whose existing keys are already
- * in order keep them; only the others get new keys between their neighbours.
+ * Gives every item a sort key. Items whose existing keys are already in order
+ * keep them; the others get new keys between their neighbours. Items marked
+ * `moved` (the ones the user actually moved) never keep their old key, so a
+ * move rewrites the moved card's position and not its neighbour's.
  */
-export function assignKeys(existing: (string | null)[]): string[] {
-  const keep = lisIndices(existing);
-  const out: string[] = [];
-  for (let i = 0; i < existing.length; i++) {
+export function assignKeys(existing: (string | null)[], moved: boolean[] = []): string[] {
+  const candidates = existing.map((k, i) => (moved[i] ? null : k));
+  const keep = lisIndices(candidates);
+  const out: string[] = new Array(existing.length);
+  let i = 0;
+  while (i < existing.length) {
     if (keep.has(i)) {
-      out.push(existing[i]!);
+      out[i] = existing[i]!;
+      i++;
       continue;
     }
-    let next: string | null = null;
-    for (let j = i + 1; j < existing.length; j++) {
-      if (keep.has(j)) {
-        next = existing[j];
-        break;
-      }
-    }
-    out.push(generateKeyBetween(i > 0 ? out[i - 1] : null, next));
+    // A run of items needing keys: generate them together so keys stay short.
+    let j = i;
+    while (j < existing.length && !keep.has(j)) j++;
+    const keys = generateNKeysBetween(i > 0 ? out[i - 1] : null, j < existing.length ? existing[j] : null, j - i);
+    for (let k = i; k < j; k++) out[k] = keys[k - i];
+    i = j;
   }
   return out;
 }
@@ -266,13 +269,21 @@ export function commit(doc: Doc, after: Board, actor: string, by: string | null,
     }
   }
 
-  // Cards
+  // Cards. A card counts as moved by this edit if the edit touched it and its column or position changed.
+  const before = materialize(doc);
+  const beforeIndex = new Map<string, string>();
+  for (const col of before.columns) col.cardIds.forEach((id, i) => beforeIndex.set(id, `${col.id}:${i}`));
   const seenCards = new Set<string>();
   for (const col of after.columns) {
     const keys = assignKeys(
       col.cardIds.map((id) => {
         const rec = doc.cards[id];
         return rec && rec.alive.v && rec.place.v.col === col.id ? rec.place.v.pos : null;
+      }),
+      col.cardIds.map((id, i) => {
+        const was = before.cards[id];
+        const now = after.cards[id];
+        return !!was && !!now && now.updatedAt !== was.updatedAt && beforeIndex.get(id) !== `${col.id}:${i}`;
       }),
     );
     col.cardIds.forEach((id, i) => {
@@ -361,7 +372,7 @@ export function findConflicts(local: Doc, remote: Doc, me: string): Conflict[] {
 
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const ACTOR = /^[A-Za-z0-9_-]{0,40}$/;
-const POS = /^[0-9A-Za-z]{1,64}$/;
+const POS = /^[0-9A-Za-z]{1,1024}$/;
 
 function validKey(k: unknown): k is string {
   if (typeof k !== 'string' || !POS.test(k)) return false;
