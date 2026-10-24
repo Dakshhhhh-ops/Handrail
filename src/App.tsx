@@ -66,7 +66,23 @@ function isNewHere(): boolean {
   }
 }
 
+/**
+ * A first visit (nothing saved yet) starts with teammates' changes already waiting, so the
+ * main feature is the first thing anyone sees. Not for share links or the eyes-closed
+ * challenge, which set up their own boards.
+ */
+function isFirstVisit(): boolean {
+  try {
+    const q = new URLSearchParams(window.location.search);
+    return !localStorage.getItem(STORY_SEEN) && !localStorage.getItem('handrail:v1') && !window.location.hash.startsWith('#board=') && !q.has('blindfold');
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
+  // Read before the store saves anything.
+  const [firstVisit] = useState(isFirstVisit);
   const [story, setStory] = useState(showStoryFirst);
   const [newHere, setNewHere] = useState(isNewHere);
   const [arrived, setArrived] = useState(false);
@@ -102,7 +118,7 @@ export default function App() {
           }}
         />
         </Suspense>
-      ) : <Shell store={store} arrived={arrived} newHere={newHere} onStory={() => { window.scrollTo(0, 0); setNewHere(false); setStory(true); }} />}
+      ) : <Shell store={store} arrived={arrived} newHere={newHere} firstVisit={firstVisit} onStory={() => { window.scrollTo(0, 0); setNewHere(false); setStory(true); }} />}
     </AnnouncerProvider>
   );
 }
@@ -129,7 +145,7 @@ function useToday(): Date {
   return useMemo(() => new Date(day), [day]);
 }
 
-function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory: () => void; arrived: boolean; newHere: boolean }) {
+function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handrail; onStory: () => void; arrived: boolean; newHere: boolean; firstVisit: boolean }) {
   const { announce, message: lastMessage } = useAnnounce();
   const today = useToday();
   const { board, me, settings } = store;
@@ -154,7 +170,7 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
   const historyId = useRef(0);
   const [justMine, setJustMine] = useState(false);
   const [showBefore, setShowBefore] = useState(false);
-  const [welcome, setWelcome] = useState(newHere && !new URLSearchParams(window.location.search).has('blindfold'));
+  const [welcome, setWelcome] = useState((newHere || firstVisit) && !new URLSearchParams(window.location.search).has('blindfold'));
   const dismissWelcome = () => {
     setWelcome(false);
     try {
@@ -396,8 +412,11 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
 
   useEffect(() => {
     entrance(document.querySelector<HTMLElement>('main'));
-    // Coming from the story: land somewhere useful, and say where.
-    if (arrived) {
+    if (firstVisit) {
+      // First visit: the teammates' changes are waiting; the arrival flow announces them and moves focus there.
+      simulateTeammates();
+    } else if (arrived) {
+      // Coming from the story: land somewhere useful, and say where.
       focusLater('board-switcher');
       announce(`Board opened: ${store.board.title}. Press slash to type a command, or Tab to reach the cards.`);
     } else if (!window.location.hash.startsWith('#board=') && !store.changesAcknowledged && store.changes.length) {
@@ -783,18 +802,18 @@ function Shell({ store, onStory, arrived, newHere }: { store: Handrail; onStory:
         {welcome && (
           <aside className="welcome" aria-label="New here">
             <p>
-              <strong>New here?</strong> This sample board belongs to Priya, who is blind. Her teammates changed it overnight.
+              <strong>New here?</strong> This sample board belongs to Priya, who is blind. Riya and Arjun changed it overnight, and
+              Handrail has already listed what changed, under <strong>Since you last looked</strong>. Try <strong>Show me on the board</strong> or <strong>Before / now</strong>.
             </p>
             <div className="action-list">
-              <button type="button" className="btn btn-primary small" onClick={() => { dismissWelcome(); simulateTeammates(); }}>
-                See what changed
-              </button>
-              <button type="button" className="btn btn-secondary small" onClick={() => { dismissWelcome(); setBlindfold(true); }}>
+              <button type="button" className="btn btn-primary small" onClick={() => { dismissWelcome(); setBlindfold(true); }}>
                 Try it with your eyes closed
               </button>
-              <button type="button" className="btn btn-quiet small" onClick={() => { dismissWelcome(); onStory(); }}>
-                1-minute story
-              </button>
+              {!arrived && (
+                <button type="button" className="btn btn-quiet small" onClick={() => { dismissWelcome(); onStory(); }}>
+                  1-minute story
+                </button>
+              )}
               <button type="button" className="btn btn-quiet small icon-only" aria-label="Dismiss" onClick={dismissWelcome}>
                 <CloseIcon size={18} />
               </button>

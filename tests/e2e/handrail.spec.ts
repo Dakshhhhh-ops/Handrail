@@ -671,13 +671,17 @@ test.describe('the story (first visit)', () => {
     await page.keyboard.press('Tab');
     await expect(page.getByRole('button', { name: 'Open the board' }).first()).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(page.locator('#board-switcher')).toBeFocused();
-    await expect(page.getByTestId('live-region')).toContainText('Board opened');
-    await expect(page.getByRole('complementary', { name: 'New here' })).toHaveCount(0);
-    // Reloading while you work goes straight to the board.
+    // A first visit lands on the main feature: teammates' changes already waiting and announced.
+    await expect(page.getByRole('heading', { name: 'Since you last looked' })).toBeFocused();
+    await expect(page.getByTestId('live-region')).toContainText('4 changes since you last looked, 1 for you');
+    await expect(page.getByTestId('change-list').getByRole('listitem')).toHaveCount(4);
+    await expect(page.getByRole('complementary', { name: 'New here' })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'New here' }).getByRole('button', { name: '1-minute story' })).toHaveCount(0);
+    // Reloading while you work goes straight to the board, and the changes are still waiting.
     await page.reload();
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
     await expect(page.getByRole('complementary', { name: 'New here' })).toHaveCount(0);
+    await expect(page.getByTestId('change-list').getByRole('listitem')).toHaveCount(4);
     // ?story always shows it, and leaving it tidies the address.
     await page.goto('/?story');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Never hunt for what changed\./);
@@ -686,12 +690,14 @@ test.describe('the story (first visit)', () => {
     await ctx.close();
   });
 
-  test('?board skips the story; the welcome line’s “See what changed” runs the teammate demo', async ({ browser }) => {
+  test('?board skips the story and still opens with the changes waiting', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const page = await ctx.newPage();
     await page.goto('/?board');
-    await page.getByRole('button', { name: 'See what changed' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
     await expect(page.getByTestId('changes')).toContainText('4');
+    await expect(page.getByRole('heading', { name: 'Since you last looked' })).toBeFocused();
+    await expect(page.getByRole('complementary', { name: 'New here' }).getByRole('button', { name: 'Try it with your eyes closed' })).toBeVisible();
     await ctx.close();
   });
 
