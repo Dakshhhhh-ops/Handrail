@@ -1,6 +1,6 @@
 # Evidence: what screen-reader users report about today's tools
 
-These are published sources about the problem Handrail works on. They describe existing tools (Trello, Jira, collaborative editors), not Handrail. Nobody quoted here has tested Handrail. For tests of Handrail itself, see [USER-TESTS.md](USER-TESTS.md).
+These are published sources about the problem Handrail works on. They describe existing tools (Trello, Jira, collaborative editors), not Handrail. Nobody quoted here has tested Handrail. For what testing of Handrail itself has and hasn't been done, see [Limitations](../README.md#limitations) in the README.
 
 ## 1. Blind users need to know what others changed
 

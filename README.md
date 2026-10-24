@@ -1,107 +1,127 @@
 # Handrail
 
+[![Test and deploy](https://github.com/Dakshhhhh-ops/Handrail/actions/workflows/deploy.yml/badge.svg)](https://github.com/Dakshhhhh-ops/Handrail/actions/workflows/deploy.yml)
+
 **A project board that tells you what changed, so you never have to hunt for it, with or without sight.**
 
-**Try it:** https://dakshhhhh-ops.github.io/Handrail/. It needs no account. A 1-minute scroll story opens first (once per visit), then a sample group project where teammates' changes are already waiting, so you land on the main feature. To skip the story, use [?board](https://dakshhhhh-ops.github.io/Handrail/?board).
+Handrail is a project board for group work. When your teammates change things, it tells you in a few plain sentences what changed and who did it, starting with what involves you, and then names the one card you should do next. It's built first for screen-reader users, who otherwise have to listen to every card on the board to find one change.
 
-- **Try it with your eyes closed:** https://dakshhhhh-ops.github.io/Handrail/?blindfold. The screen goes dark and Handrail talks you through finding what changed and moving a card, by keyboard only. It takes about a minute and is timed.
-- **See the main feature:** on your first visit the changes are already listed under *Since you last looked*. Try **Show me on the board** and **Before / now**. To run it again, click the board name and choose *Simulate teammates' changes*.
+**[Open Handrail](https://dakshhhhh-ops.github.io/Handrail/?board)** · **[Try it with your eyes closed](https://dakshhhhh-ops.github.io/Handrail/?blindfold)** · [How it works](docs/HOW-IT-WORKS.md) · [Evidence of the problem](docs/EVIDENCE.md)
 
-![The board with an Activity panel listing four changes since you last looked, one marked "for you", and the changed cards tagged on the board](docs/changes.png)
+No account, no install, no server. It runs in the browser and keeps your boards on your device.
 
-## One problem, one loop
+![The board with the Activity panel open: "Since you last looked: 4 changes, 1 for you", a plain-sentence summary, the next step "Draft the outline", and changed cards tagged with who changed them](docs/changes.png)
 
-Handrail does one job: **telling you what your teammates changed, when you can't scan the board.** Everything in the main app serves one loop:
+## Try it in one minute
 
-1. **Changes arrive:** from the group's Trello board each time Handrail opens, or from a teammate's link.
-2. **Handrail says what changed,** in plain sentences, with what involves you first.
-3. **You know your next step, and act on it without dragging:** Handrail names the one card to do next, and you use keys, a menu, or a typed or spoken sentence. Undo anything.
+1. **[Open the board](https://dakshhhhh-ops.github.io/Handrail/?board).** A short tour opens first. On a first visit, Priya's teammates have already changed her board, so *Since you last looked* lists four changes, one of them for her.
+2. **Press Show me on the board**: each teammate's cursor flies to the cards they changed. **Before / now** flips the board back to how it looked.
+3. **Press `/` and type** `what next`, then `move find sources to doing`. Handrail shows what it understood before you press Enter. **Ctrl+Z** undoes it.
+4. **[Try it with your eyes closed](https://dakshhhhh-ops.github.io/Handrail/?blindfold)**: the screen goes dark, the mouse stops working, and Handrail talks you through three small tasks. It takes about a minute and is timed.
 
-The supporting pieces exist only because the loop needs them. The CRDT merge lets two copies of a board be compared and combined. Keyboard moves make the board usable at all without a mouse. Trello import means nobody has to switch tools.
-
-**Kept out of the main app on purpose.** Live sessions, CSV import and export, and 3D card tilt are in **Settings → Labs**, off by default. They work, but they aren't the point.
+Without `?board`, the site opens with a one-minute scroll story first (once per visit).
 
 ## The problem
 
-In a group project, the hard part is often not doing your own task. It is **finding out what everyone else changed** since you last looked. On Trello, Notion or Jira you find out by scanning: you glance across the columns and notice that "Slides" moved to Done, or that a new card has your name on it. Activity feeds exist, but they are long lists of raw events, and written summaries are a paid AI add-on. Scanning is slow for everyone, and for a screen-reader user it means stepping through every card in every column to spot one difference.
+In a group project, the hard part is often not your own task. It's **finding out what everyone else changed** since you last looked. On a shared board, sighted teammates glance across the columns and spot it in a second. Activity feeds exist, but they list raw events, newest first, for the whole board.
 
-Handrail does the scanning for you. When a teammate sends their link, it writes every change as a plain sentence, puts the ones that involve you first, and tags those cards on the board. It's free, private and screen-reader-first.
+For a blind student using a screen reader, there is no glance. Finding one change means listening to every card in every column, one at a time. And moving a card usually means dragging it, which a screen reader can't do. WCAG 2.2 makes this a requirement: [2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html) says anything done by dragging must also be possible without dragging.
 
-Moving cards without a mouse is not new (GitHub Projects and Jira support keyboard moves). Handrail includes it because the same people who can't scan a board often can't drag one either:
+This isn't hypothetical. Trello has open NVDA bugs with "no known workaround", Jira's own tracker says its board's drag-and-drop "is inaccessible to screen reader users", and research on blind people in shared tools recommends "accessible awareness" of what others changed. The sources are in [docs/EVIDENCE.md](docs/EVIDENCE.md).
 
-- **Blind and low-vision students**, who use screen readers or magnifiers.
-- **Students with motor impairments** (tremor, RSI, one-handed use) who can't hold a mouse button steady while dragging.
-- **Keyboard-only and voice-control users.**
+**Who it's for:** Priya, a blind student working with the NVDA screen reader on a group project, and her teammates Riya and Arjun, who use a mouse. Also students with motor impairments who can't drag reliably, and keyboard-only and voice-control users.
 
-WCAG 2.2 covers this in [2.5.7 Dragging Movements](https://www.w3.org/WAI/WCAG22/Understanding/dragging-movements.html): anything done by dragging must also be possible without dragging.
+## One problem, one loop
 
-This isn't hypothetical. Trello has open NVDA bugs with "no known workaround", Jira's tracker says its board's drag-and-drop "is inaccessible to screen reader users", and research on blind people in shared tools recommends "accessible awareness" of what others changed. Sources: [docs/EVIDENCE.md](docs/EVIDENCE.md).
+Handrail does one job: **telling you what your teammates changed, when you can't scan the board.** The main app is one loop:
 
-**Handrail's user:** Priya, a blind student working with NVDA on a group project. Her teammates Riya and Arjun use the board with a mouse.
+1. **Changes arrive:** from the group's Trello board each time Handrail opens, or from a teammate's link.
+2. **Handrail says what changed,** in plain sentences, with what involves you first.
+3. **You get one clear next step, and act on it without dragging:** keys, a menu, or a typed or spoken sentence. Anything can be undone.
 
-### Nobody has to switch from Trello
-
-Priya's group already lives in Trello, and they won't move for one person. They don't have to. In **Boards & files → Connect Trello**, Priya signs in to Trello once (read-only) and follows the group's board. Every time she opens Handrail, it reads the board from Trello and tells her what changed **in Trello** since she last looked, credited from Trello's own activity log: *"Riya Sharma moved 'Write method' from To Do to Doing."* Nothing to export, and her teammates never change tools. (Importing a Trello JSON export still works too, for anyone without a connection.)
-
-Trello ids are kept, so a re-import updates the same board instead of making a copy. Trello's last export is stored as its own copy of the document, and a re-import is merged like a teammate's link. Only what changed in Trello is applied. Cards Priya added or moved in Handrail in between stay as she left them, unless Trello changed the same card, in which case Trello's newer change wins and she is told.
+The rest exists because the loop needs it: the merge lets two copies of a board be combined without losing work, keyboard moves make the board usable without a mouse, and Trello support means nobody has to switch tools. Extras that aren't part of the loop (live sessions, CSV import and export, 3D card tilt) are in **Settings → Labs**, off by default.
 
 ## What it does
 
 | Instead of… | In Handrail you… |
 |---|---|
-| Scanning the board for changes | Open your teammate's link and see or hear **"Since you last looked: Riya assigned 'Email Dr. Mehta' to you. Arjun moved 'Write the script' to Doing…"**. Changes that involve you come first, and changed cards are tagged on the board ("Riya · moved") |
-| Dragging a card | Type or say **"move find sources to doing"** (Handrail shows what it will do before you press Enter), press a **number key** (3 sends it to column 3), or **pick it up with Space** and move it with the arrow keys |
-| Reading every card to find deadlines | Ask **"what's due this week"**, **"anything overdue"** or **"my tasks"**, or press **Just mine** to see only your cards and the changes that involve you |
+| Scanning the board for changes | Hear or read **"4 changes since you last looked, 1 for you. Riya gave you 'Email Dr. Mehta about the extension'…"**. Changes that involve you come first, and changed cards are tagged on the board ("Riya · moved") |
+| Working out what to do first | Get **one next step** after every summary: *"Your next step: 'Draft the outline'. It's overdue by 1 day."* Ask **"what next"** any time. It picks your most overdue card, then one a teammate just gave you, then the one due soonest |
+| Sitting through a long readout | Hear the count and the first sentence. Say **"more"** for the rest, or **"repeat"** to hear the last message again |
+| Dragging a card | Type or say **"move find sources to doing"**, press a **number key** (3 sends a card to column 3), or **pick it up with Space** and move it with the arrow keys |
+| Reading every card to find deadlines | Ask **"what's due this week"**, **"anything overdue"** or **"my tasks"**, or press **Just mine** |
 | Fiddly date pickers | Type **"due next friday"**, **"in 3 days"** or **"oct 30"** |
-| Working out what to do first | Every summary ends with **one next step**: *"Your next step: 'Draft the outline'. It's overdue by 1 day."* Ask **"what next"** any time. It picks the most overdue card, then one a teammate just gave you, then the one due soonest |
-| Sitting through a long readout | Hear the count and the first sentence; say **"more"** for the rest, or **"repeat"** to hear the last message again |
-| Hoping you didn't break something | **Undo** any change with Ctrl+Z, the Undo button, or by saying "undo" |
-| Spotting what moved by eye | **Before / now** flips the board to how it looked when you last saw it; flip back and every changed card glides to its new place. **Show me on the board** sends each teammate's name-tagged cursor to the cards they changed |
+| Worrying you broke something | **Undo** any change with Ctrl+Z, the Undo button, or by saying "undo". The Delete key asks for a second press first |
+| Spotting what moved by eye | **Before / now** flips the board to how you last saw it. **Show me on the board** sends each teammate's name-tagged cursor to the cards they changed |
+| Learning a new tool | A **quick tour** on the first visit shows the main parts, one highlighted step at a time. It's in Help any time |
 
-| Command box | Keyboard pick-up | Action menu instead of dragging |
+| Typed command, with a preview | Keyboard pick-up | Menu instead of dragging |
 |---|---|---|
-| ![Command box replying "Moved to Doing"](docs/command.png) | ![A picked-up card with a dashed outline and key hints](docs/keyboard.png) | ![Card action menu with Move to, Order and Card buttons](docs/menu.png) |
+| ![The command box with "move find sources to doing" typed, and the preview "Move 'Find five sources on heat waves' to Doing" underneath](docs/command.png) | ![A card picked up with Space, shown with a dashed outline, and a bar of key hints: arrows move, Enter drops, Escape cancels](docs/keyboard.png) | ![The card menu: Move to To do, Doing or Done; move up or down; edit, read aloud or delete](docs/menu.png) |
 
-| Paper theme | Phone |
-|---|---|
-| ![The board in the cream Paper theme with the night-blue Activity panel](docs/contrast.png) | ![Board on a phone, columns stacked, command box docked at the bottom](docs/phone.png) |
+| Quick tour | Light theme | Phone |
+|---|---|---|
+| ![The quick tour, step 2 of 5, "See what changed", with the Since you last looked panel highlighted](docs/tour.png) | ![The board in the light theme with the dark Activity panel](docs/contrast.png) | ![The board on a phone: columns stacked, the command box docked at the bottom](docs/phone.png) |
+
+## Works with Trello
+
+Priya's group already lives in Trello, and they won't move for one person. They don't have to.
+
+- **Connect once:** in **Boards & files → Connect Trello**, Priya signs in with Trello's own read-only sign-in and follows the group's board. Every time she opens Handrail, it reads the board from Trello and lists what changed there since she last looked.
+- **Credited to the right person:** each kind of change (a move, a rename, a new due date, an assignment) is credited to whoever made it in Trello, from Trello's activity log: *"Riya Sharma moved 'Write the method' from To do to Doing."* Comments don't count, so a comment can't take credit for someone else's move.
+- **Her edits are kept:** Trello's last copy of the board is stored separately and merged like a teammate's link, so cards Priya added or moved in Handrail stay as she left them, unless the same card changed in Trello.
+- **No connection needed to try it:** importing a Trello JSON export works too, and re-importing a newer export lists what changed.
+
+## Accessibility
+
+- Built to **WCAG 2.2 AA**. An automated **axe-core** audit runs on every push, in three themes, in every dialog and at phone width, with zero violations. Layout tests check 200% text at phone, tablet and laptop widths.
+- **Tested with the real NVDA screen reader.** We recorded Handrail with NVDA and read its speech log line by line. That found five problems the automated audit had missed, and all are fixed.
+- **One keyboard model everywhere:** the whole board is one Tab stop, arrow keys move between cards, Space picks a card up, Enter opens its menu, and number keys send it to a column. The board is marked as an application, so screen readers switch to focus mode on a card. Every action is announced through one live region.
+- **Reading support:** a high-contrast theme, text up to 200%, the Atkinson Hyperlegible and OpenDyslexic fonts, relaxed spacing, a stacked layout for screen magnifiers, and replies read aloud for people who don't use a screen reader.
+- **Motion with a purpose, and an off switch:** cards glide when they move so sighted teammates can see what changed. Everything turns off with the system's reduced-motion setting or Handrail's own setting.
 
 ## Limitations
 
-- **Not yet tested with blind or motor-impaired users.** We tested it ourselves with NVDA (we are sighted), which found five problems the automated audit missed; all are fixed. Five sighted classmates also tried the eyes-closed challenge on 24 October 2026; we didn't record their times. The design follows WCAG 2.2 and the WAI-ARIA Authoring Practices. That is still not the same as blind users saying it works. The next step is sessions with screen-reader users.
-- **Without Trello, getting changes in takes a step.** A teammate has to send a newer link. Nobody sends a link after every edit, so this is a catch-up, not a live feed. Groups on Trello don't need the step: Handrail reads their board each time it opens.
-- **Screen reader modes.** The board is marked as an application, so screen readers should switch to focus mode when you land on a card, and arrows, Space and number keys reach Handrail. This follows the documented behaviour of NVDA and JAWS but hasn't been re-recorded with NVDA since the change. If a screen reader stays in browse mode, it keeps those keys for itself. Enter on a card (the action menu) and the command box work in either mode, and Help explains this.
-- **Share links grow with the board.** The sample board's link is about 2,000 characters, around Discord's message limit. Long links work in email and most chat apps, and "Download backup" works for any size.
-- **Live sessions need both people online at once**, and use public relays to connect. Some strict school or office networks block peer-to-peer connections; share links still work there. There is no always-on sync server, so a teammate who is offline catches up when they open a newer link.
-- **Merging picks a winner per field.** If two people edit the same field at the same moment, one version is kept (the later one) and the other person is told; the text isn't combined.
-- **Voice input** depends on the browser's speech recognition (Chrome and Edge, online). Typing commands works everywhere.
+- **Not yet tested with blind or motor-impaired users.** We tested it ourselves with NVDA (we are sighted). Five sighted classmates also tried the eyes-closed challenge on 24 October 2026; we didn't record their times. That is not the same as blind users saying it works. Sessions with screen-reader users are the next step.
+- **Screen-reader focus mode isn't re-verified.** The board is marked as an application so screen readers switch to focus mode on a card; this follows the documented behaviour of NVDA and JAWS but hasn't been re-recorded with NVDA since the change. In browse mode, Enter on a card (the menu) and the command box still work.
+- **Trello is read-only and checked when Handrail opens.** It isn't a live feed, and changes made in Handrail don't go back to Trello. Changes that Trello's activity log doesn't cover are credited to "Someone in Trello". Handrail has one assignee per card, so a Trello card with several members shows the first. Trello's sign-in token lasts 30 days.
+- **Without Trello, changes arrive by link.** A teammate has to send a newer link, so it's a catch-up rather than a live feed. Live sessions (in Labs) need everyone online at once and use public relays, which some school networks block.
+- **Merging picks a winner per field.** If two people edit the same field at the same moment, the later edit is kept and the other person is told; the text isn't combined.
+- **Share links grow with the board.** The sample board's link is about 2,000 characters. Long links work in email and most chat apps, and **Download backup** works for any size.
+- **Voice input** needs a browser with speech recognition (Chrome or Edge, online). Typing works everywhere.
 - **English only** for commands and dates.
-- **Trello is read-only, and checked when Handrail opens.** It isn't a live feed, and changes made in Handrail don't flow back to Trello. The connection needs a Trello API key built into the app (or pasted in once), and Trello's sign-in token lasts 30 days. Changes Trello's activity log doesn't cover are credited to "Someone in Trello", and changes made in Handrail don't flow back to Trello. Handrail has one assignee per card, so a Trello card with several members shows the first.
 
 ## Run it locally
+
+Needs Node.js 24.
 
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm test             # 136 unit and property-based tests
-npm run test:e2e     # 62 browser tests, including the axe accessibility audit
+npm test             # 136 unit and property-based tests (Vitest, fast-check)
+npm run test:e2e     # 62 browser tests (Playwright), including the axe accessibility audit
 npm run build        # static site in dist/
 ```
 
-Every push to `main` runs type-checking and both test suites, then deploys to GitHub Pages ([workflow](.github/workflows/deploy.yml)).
+Every push to `main` type-checks, runs both test suites, then deploys to GitHub Pages ([workflow](.github/workflows/deploy.yml)). To build with Trello's direct connection turned on, set `VITE_TRELLO_KEY` to a Trello API key; without one, the app asks for a key when you connect.
+
+```
+src/
+  model/       board logic with no UI: commands, dates, the CRDT merge, the summary, next step, Trello import
+  store/       app state, saving, merging teammates' and Trello's changes
+  components/  the board, Activity panel, command box, dialogs, quick tour, eyes-closed challenge
+  lib/         live sessions, Trello connection, motion, bounded decompression
+tests/
+  unit/        Vitest and fast-check
+  e2e/         Playwright and axe-core
+```
 
 ## How it works
 
-The details are in [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md):
+The technical detail is in **[docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md)**: how sharing and merging work without a server, the keyboard reference, the architecture, testing, and privacy.
 
-- [Built for many ways of working](docs/HOW-IT-WORKS.md#built-for-many-ways-of-working): screen readers, keyboard, voice, low vision and dyslexia, motion
-- [How sharing works (no server)](docs/HOW-IT-WORKS.md#how-sharing-works-no-server): share links and the CRDT merge
-- [Keyboard](docs/HOW-IT-WORKS.md#keyboard): every shortcut
-- [How it's built](docs/HOW-IT-WORKS.md#how-its-built): architecture, merging, undo, the digest, testing
-- [Privacy](docs/HOW-IT-WORKS.md#privacy)
-
-Evidence that the problem is real (Trello and Jira bug reports, research, survey numbers) is in [docs/EVIDENCE.md](docs/EVIDENCE.md).
+In short: every board is a **conflict-free replicated document (CRDT)**, so copies can be edited separately and merged in any order without losing anyone's work. Commands and summaries come from a **hand-written parser, not AI**, so they're instant, work offline, and the same changes always give the same words.
 
 ## License
 
-MIT
+[MIT](LICENSE)

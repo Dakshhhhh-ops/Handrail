@@ -5,13 +5,14 @@ The technical detail behind the [README](../README.md).
 ## Built for many ways of working
 
 - **Screen readers:** every card has a full spoken name ("Draft the outline, overdue by 1 day, assigned to you, has notes. 1 of 1 in Doing"). Every action is confirmed through a live region. Dialogs are native `<dialog>` elements, so focus is trapped and returned properly.
-- **Keyboard:** one tab stop for the whole board, arrow-key navigation between cards, single-key shortcuts, and skip links. See the keyboard table under Help.
+- **Keyboard:** one tab stop for the whole board, arrow-key navigation between cards, single-key shortcuts, and skip links (the first one jumps straight to unread changes). The board is marked as an application, so screen readers switch to focus mode on a card and the keys reach Handrail. See the keyboard table below, or press `?`.
 - **Voice:** a Speak button, in browsers with speech recognition (Chrome, Edge). Card-name matching tolerates recognition slips: "lab raport" still finds "Lab report".
 - **Low vision and dyslexia:** high-contrast theme, text up to 200%, Atkinson Hyperlegible or OpenDyslexic fonts, relaxed spacing, a stacked layout for screen magnifiers, and replies read aloud for people who don't use a screen reader.
 - **Mouse users:** normal drag-and-drop still works, so mixed groups can share one board.
 - **Motion with a purpose:** cards glide when they move (so sighted teammates see what changed), and the front page is a 1-minute scroll story with a 3D board (GSAP, ScrollTrigger, Lenis). It shows once per visit, and "Open the board" is the first thing you reach by Tab. All of it turns off with the system's reduced-motion setting or Handrail's own "Turn off animations", and the story has a Pause button.
 - **Works offline and installs like an app:** a service worker keeps a copy, so once opened Handrail works without a connection.
-- **Groups already on Trello:** import a Trello JSON export, then re-import newer exports to hear what changed in Trello (see above). Export as a backup or as plain text (CSV is in Labs).
+- **Groups already on Trello:** connect once (read-only) and Handrail reads the board each time it opens, or import a Trello JSON export. Export as a backup or as plain text (CSV is in Labs).
+- **First-time visitors:** a five-step quick tour highlights each part of the screen. It's a native dialog, so it works by keyboard and screen reader, and it's in Help any time.
 
 
 ## How sharing works (no server)
@@ -26,11 +27,14 @@ Handrail has no backend and no accounts. Every board is a **conflict-free replic
 
 To try it without two devices, click the board name, then choose **Simulate teammates' changes**.
 
+**Trello** works the same way. Handrail keeps Trello's last copy of the board as its own document. When it reads the board again (through the read-only connection, or a newer export), it commits Trello's changes to that copy, credited per field to whoever made them in Trello's activity log, and merges it like a teammate's link. Cards that didn't move in Trello keep their positions, so edits made in Handrail survive.
+
 ## Keyboard
 
 | Key (on a card) | Action |
 |---|---|
 | Arrow keys | Move between cards |
+| Home / End | First / last card in the column |
 | Enter | Action menu (move to a column, reorder, edit, delete) |
 | Space | Pick up. Then arrows move it, Enter drops it, Escape cancels |
 | 1–9 | Send to that column |
@@ -49,7 +53,8 @@ flowchart LR
   DOC --> mat["materialize()"] --> UI
   LINK["Share link<br/>#board=…"] -- "validate · merge" --> DOC
   LIVE["Live session<br/>WebRTC peers"] <-- "merge · publish" --> DOC
-  DOC -- "seen vs now" --> DIFF["diff + conflicts"] --> SUM["digest:<br/>“Riya moved 2 cards…”"] --> SR["Activity panel<br/>+ screen reader"]
+  TRELLO["Trello board<br/>read-only API or export"] -- "commit to Trello's copy · merge" --> DOC
+  DOC -- "seen vs now" --> DIFF["diff + conflicts"] --> SUM["digest + next step:<br/>“Riya moved 2 cards…”"] --> SR["Activity panel<br/>+ screen reader"]
 ```
 
 - **React 18 + TypeScript + Vite**, a static site with no backend. `src/model/` is plain TypeScript with no UI code, so it is unit-tested.
@@ -57,7 +62,9 @@ flowchart LR
   - Card order uses **fractional indexing** (copied from rocicorp/fractional-indexing, the approach Figma and Linear describe). A commit keeps the keys of the longest increasing run of cards that didn't move, so a move rewrites one register.
   - `findConflicts` spots fields two people changed without seeing each other's write, so the app can explain what it kept.
 - **Per-action undo** (`revert.ts`). Undo puts back only what your action changed, and only where the board still shows your result, so a teammate's edits that merged in since are kept. Undoing a delete brings the card back with its newest content, including edits a teammate made after you deleted it, and Escape while carrying a card puts back only that card.
-- **The digest** (`diff.ts`, `summary.ts`). It compares the board you last saw with the merged one, credits each change from the register's author, and folds the changes into short sentences grouped by person, with what involves you first.
+- **The digest** (`diff.ts`, `summary.ts`). It compares the board you last saw with the merged one, credits each change from the register's author, and folds the changes into short sentences grouped by person, with what involves you first. The spoken version gives the count and the first sentence; "more" reads the rest.
+- **The next step** (`next.ts`). One of your open cards, chosen deterministically: the most overdue, then one a teammate just gave you, then the one due soonest.
+- **Trello** (`importers.ts`, `lib/trello.ts`). Trello's ids are kept, so a newer copy maps onto the same board. Each change is credited from Trello's activity log by kind (move, rename, due date, assignment, notes, archive); comments are ignored. The connection uses Trello's own token sign-in with read-only scope, straight from the browser.
 - **Live sync** (`lib/live.ts`). Trystero over Nostr relays, loaded only when a session starts. The protocol is: say hello, send your document when someone joins, and send it again after each of your own edits (debounced). Version vectors stop echoes.
 - **Plain-language commands** (`commands.ts`, `match.ts`, `dates.ts`, `preview.ts`). A deterministic parser with no AI service: offline, instant, private and predictable.
   - Fuzzy matching tolerates speech-recognition slips ("lab raport").
@@ -69,8 +76,9 @@ flowchart LR
   - Clocks and version vectors are derived from the writes themselves, and implausible clocks are refused.
 - **Testing:** 136 Vitest tests and 62 Playwright tests.
   - Property-based tests (fast-check) generate hundreds of random three-person edit-and-swap histories and check that everyone ends up with the same, well-formed board.
-  - Browser tests cover two people merging concurrent edits, keyboard-only use, and a real two-browser live session.
-  - **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog, phone width and 200% text, with zero violations.
+  - Browser tests cover two people merging concurrent edits, keyboard-only use, the Trello connection (against a fake Trello), and a real two-browser live session (run locally; it needs the public relays, so CI skips it).
+  - **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog and at phone width, with zero violations. Layout tests check 200% text at 320, 768 and 1280 px.
+  - **NVDA:** we recorded the app with the real NVDA screen reader and read its speech log; that found five problems the audit missed, all fixed.
 
 ## Privacy
 

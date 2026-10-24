@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "A project board you can use without dragging, seeing, or a mouse.",
+  "description": "A project board that tells you what changed, so you never have to hunt for it, with or without sight.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
