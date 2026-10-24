@@ -634,8 +634,6 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 }
 :root[data-theme='contrast'] .news-num { border-color: #fff; box-shadow: none; }
 .digest { margin: 0 0 0.85rem; font-size: 1.04rem; line-height: 1.55; }
-.next-step { margin: 0 0 0.85rem; padding: 0.55rem 0.75rem; border-left: 4px solid currentColor; border-radius: 6px; background: color-mix(in srgb, currentColor 7%, transparent); font-weight: 600; line-height: 1.5; }
-.next-step .btn { margin-left: 0.25rem; }
 .changes-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
 .changes-collapsed { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .change-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.4rem; }
@@ -919,3 +917,25 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
   border: 2px solid var(--butter); border-radius: var(--radius-lg); background: var(--accent-soft);
 }
 .welcome p { margin: 0; }
+
+/* ---- Fits a 1280×720 laptop ------------------------------------------------------ */
+/* Speak shrinks to its microphone when the command panel is narrow, so Do it stays on the same row. */
+.command-form { container-type: inline-size; }
+@container (max-width: 380px) {
+  .command-row .btn.mic { padding-inline: 0.85rem; }
+  .mic-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+/* Add column is a slim vertical button, so it never pushes past the edge. */
+.column.column-add { flex: 0 0 auto; min-width: 0; max-width: none; padding: 0; background: none; border: 0; align-self: flex-start; }
+.column-add .btn { writing-mode: vertical-rl; min-width: 52px; min-height: 180px; padding: 1rem 0.5rem; gap: 0.5rem; }
+.column-add .btn svg { transform: rotate(90deg); }
+.layout-stacked .column-add .btn { writing-mode: horizontal-tb; min-height: 52px; height: auto; width: 100%; }
+.layout-stacked .column-add .btn svg { transform: none; }
+/* Next step: the sentence, then its button on its own line (like "Go to card" in the list). */
+.next-step { margin: 0 0 0.85rem; padding: 0.55rem 0.75rem; border-left: 4px solid currentColor; border-radius: 6px; background: color-mix(in srgb, currentColor 7%, transparent); }
+.next-step p { margin: 0 0 0.2rem; font-weight: 600; line-height: 1.5; }
+.changes-actions.changes-show { display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.5rem; margin: 0 0 0.85rem; }
+.changes-show .btn { width: auto; padding-inline: 0.7rem; }
+/* Headings that receive focus (e.g. "Since you last looked" on arrival): a bold ring in the
+   heading's own colour, instead of the browser's thin default. Still clearly visible. */
+:is(h1, h2, h3)[tabindex='-1']:focus-visible { outline: 3px solid currentColor; outline-offset: 5px; border-radius: 6px; }

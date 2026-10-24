@@ -533,8 +533,8 @@ export function BoardView({
         );
       })}
       <div className="column column-add">
-        <button type="button" className="btn btn-ghost" onClick={cb.addColumn}>
-          <PlusIcon size={16} /> Add column
+        <button type="button" className="btn btn-ghost" onClick={cb.addColumn} title="Add column">
+          <PlusIcon size={16} /> <span className="add-col-label">Add column</span>
         </button>
       </div>
     </div>

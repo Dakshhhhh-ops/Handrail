@@ -68,18 +68,27 @@ export function ChangesPanel({
               {justMine && shown.length < changes.length && <> · showing yours</>}
             </span>
           </p>
+          {/* The most visual moments, kept where they can be seen without scrolling. */}
+          <div className="changes-actions changes-show">
+            <button type="button" className="btn btn-secondary small" onClick={onReplay}>Show me on the board</button>
+            {hasBefore && (
+              <button type="button" className="btn btn-secondary small" aria-pressed={showingBefore} onClick={onToggleBefore}>
+                Before / now
+              </button>
+            )}
+          </div>
           {shown.length > 0 && (
             <p className="digest" data-testid="digest">
               {digest}
             </p>
           )}
           {next && (
-            <p className="next-step" data-testid="next-step">
-              <span>{next.text}</span>{' '}
+            <div className="next-step" data-testid="next-step">
+              <p>{next.text}</p>
               <button type="button" className="btn btn-quiet small" onClick={() => onGoTo(next.cardId)}>
                 Go to it
               </button>
-            </p>
+            </div>
           )}
           {shown.length > 0 ? (
             <ul className="change-list" data-testid="change-list" aria-label="Every change">
@@ -100,12 +109,6 @@ export function ChangesPanel({
             <p className="empty-note">None of these involve you. Turn off “Just mine” to see them all.</p>
           )}
           <div className="changes-actions">
-            <button type="button" className="btn btn-secondary small" onClick={onReplay}>Show me on the board</button>
-            {hasBefore && (
-              <button type="button" className="btn btn-secondary small" aria-pressed={showingBefore} onClick={onToggleBefore}>
-                Before / now
-              </button>
-            )}
             <button type="button" className="btn btn-secondary small" onClick={onReadAll}>Read aloud</button>
             {acknowledged ? (
               <button type="button" className="btn btn-secondary small" aria-expanded="true" onClick={() => { setExpanded(false); requestAnimationFrame(() => document.getElementById('changes-show')?.focus()); }}>

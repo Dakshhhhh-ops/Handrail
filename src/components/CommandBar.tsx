@@ -119,7 +119,8 @@ export function CommandBar({
               aria-pressed={listening}
             >
               {listening ? <StopIcon /> : <MicIcon />}
-              {listening ? 'Stop' : 'Speak'}
+              {/* Hidden visually (not from screen readers) when the panel is narrow; see .mic-label. */}
+              <span className="mic-label">{listening ? 'Stop' : 'Speak'}</span>
             </button>
           )}
           <button type="submit" className="btn btn-primary">

@@ -89,7 +89,9 @@ test('connects to Trello directly, follows a board, and says what changed there 
 
   await page.locator('#board-switcher').click();
   const files = page.getByRole('dialog', { name: 'Boards & files' });
-  await files.getByLabel('Trello API key').fill(key);
+  // Builds with a Trello key built in (VITE_TRELLO_KEY) don't ask for one.
+  const keyField = files.getByLabel('Trello API key');
+  if (await keyField.count()) await keyField.fill(key);
   await files.getByRole('button', { name: 'Connect Trello' }).click();
   await expect(live(page)).toContainText('Connected to Trello as Priya Sharma, read-only');
   await expect(files.getByLabel('Follow a board')).toHaveValue('B1aaaaaaaa');
