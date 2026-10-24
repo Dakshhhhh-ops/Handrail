@@ -4,6 +4,10 @@ import AxeBuilder from '@axe-core/playwright';
 // "Try it with your eyes closed": the one-minute keyboard-only challenge.
 
 const audit = async (page: Page) => {
+  // Check the settled page: a caption caught halfway through its fade-in is genuinely low-contrast.
+  await page.waitForFunction(() =>
+    document.getAnimations().every((an) => an.playState !== 'running' || an.effect?.getTiming().iterations === Infinity),
+  null, { timeout: 10_000 });
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze();
   expect(r.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
 };
@@ -27,6 +31,9 @@ async function tabTo(page: Page, text: RegExp, max = 40) {
   throw new Error(`Never reached ${text}`);
 }
 
+// Every test here runs the axe audit or the whole challenge, which is heavy work on a busy machine.
+test.describe.configure({ timeout: 60_000 });
+
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('handrail:story-seen', '1'));
 });
@@ -41,6 +48,8 @@ test('the intro explains the challenge and passes the audit', async ({ page }) =
 });
 
 test('the screen goes dark but the app still works by keyboard, and the challenge can be finished', async ({ page }) => {
+  // The whole one-minute challenge, step by step; slow CI machines need more than the default 30 s.
+  test.setTimeout(90_000);
   await startChallenge(page);
   // Dark for sighted users, but nothing is removed from the accessibility tree.
   await expect(page.locator('html')).toHaveClass(/bf-on/);

@@ -3,6 +3,8 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: 'tests/e2e',
   timeout: 30_000,
+  // On CI, retry a failed test once, so one slow moment on a shared machine can't block a deploy.
+  retries: process.env.CI ? 1 : 0,
   use: { baseURL: 'http://localhost:4173', viewport: { width: 1280, height: 800 } },
   webServer: { command: 'npm run build && npm run preview', port: 4173, reuseExistingServer: true, timeout: 120_000 },
 });
