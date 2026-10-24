@@ -8,3 +8,6 @@ playwright-report/
 video/out/
 video/tmp/
 .local/
+
+# Demo video renders and recording scripts (large; the video goes on YouTube)
+video/
