@@ -23,6 +23,14 @@ describe('diffBoards (“Since you last looked”)', () => {
     expect(changes[0].forYou).toBe(true);
   });
 
+  it('never hides a teammate who shares your first name', () => {
+    const before = demoBoard(today);
+    const after = moveCard(before, 'k-sources', 'c-doing', 0, 'Priya Patel');
+    expect(diffBoards(before, after, 'Priya', today).map((c) => c.text)).toEqual([
+      'Priya Patel moved “Find five sources on heat waves” from To do to Doing.',
+    ]);
+  });
+
   it('leaves out your own edits', () => {
     const before = demoBoard(today);
     const after = moveCard(before, 'k-sources', 'c-doing', 0, 'Priya');

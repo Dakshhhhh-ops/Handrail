@@ -26,12 +26,15 @@ export interface Change {
  */
 export function diffBoards(before: Board, after: Board, me: string | null, today: Date): Change[] {
   const out: Change[] = [];
-  const by = (name: string | null) => (name ? `${whoLabel(name, me) === 'you' ? 'You' : name}` : 'Someone');
+  // Who made a change needs an exact match: another "Priya Patel" must never be hidden as your own edit.
+  // Who a card is for can match a first name ("Priya" and Trello's "Priya Sharma").
+  const exact = (name: string | null) => !!name && !!me && name.trim().toLowerCase() === me.trim().toLowerCase();
+  const by = (name: string | null) => (name ? `${exact(name) ? 'You' : name}` : 'Someone');
   const mine = (name: string | null) => sameName(name, me);
 
   const beforeCols = new Map(before.columns.map((c) => [c.id, c]));
   const afterCols = new Map(after.columns.map((c) => [c.id, c]));
-  if (before.title !== after.title && !mine(after.titleBy ?? null)) {
+  if (before.title !== after.title && !exact(after.titleBy ?? null)) {
     out.push({ kind: 'column', text: `${by(after.titleBy ?? null)} renamed the board to “${after.title}”.`, forYou: false, by: after.titleBy ?? null });
   }
   for (const c of after.columns) {
@@ -51,7 +54,7 @@ export function diffBoards(before: Board, after: Board, me: string | null, today
       const author = (f: 'title' | 'notes' | 'due' | 'assignee' | 'place' | 'alive') =>
         now.fieldBy && now.fieldBy[f] !== undefined ? now.fieldBy[f] ?? null : now.lastEditedBy;
       const push = (c: Omit<Change, 'by'>, who: string | null) => {
-        if (!mine(who)) out.push({ ...c, by: who });
+        if (!exact(who)) out.push({ ...c, by: who });
       };
       const forYou = mine(now.assignee);
 
@@ -104,7 +107,7 @@ export function diffBoards(before: Board, after: Board, me: string | null, today
     if (!after.cards[id] && locate(before, id)) {
       const was = before.cards[id];
       const who = after.removed?.[id]?.by ?? null;
-      if (who && mine(who)) continue;
+      if (who && exact(who)) continue;
       out.push({ kind: 'removed', title: was.title, text: who ? `${by(who)} deleted “${was.title}”.` : `“${was.title}” was removed.`, forYou: mine(was.assignee), by: who });
     }
   }
