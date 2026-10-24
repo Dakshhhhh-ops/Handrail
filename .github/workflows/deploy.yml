@@ -43,6 +43,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # The app's Trello API key (public by design; set as a repository variable). Empty means people paste their own.
+          VITE_TRELLO_KEY: ${{ vars.TRELLO_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
