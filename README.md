@@ -75,7 +75,7 @@ Priya's group already lives in Trello, and they won't move for one person. They 
 ## Accessibility
 
 - Built to **WCAG 2.2 AA**. An automated **axe-core** audit runs on every push, in three themes, in every dialog and at phone width, with zero violations. Layout tests check 200% text at phone, tablet and laptop widths.
-- **Tested with the real NVDA screen reader.** We recorded Handrail with NVDA and read its speech log line by line. That found five problems the automated audit had missed, and all are fixed.
+- **Tested with the real NVDA screen reader.** We recorded Handrail with NVDA and read its speech log line by line. That found four problems the automated audit had missed, and all are fixed.
 - **One keyboard model everywhere:** the whole board is one Tab stop, arrow keys move between cards, Space picks a card up, Enter opens its menu, and number keys send it to a column. The board is marked as an application, so screen readers switch to focus mode on a card. Every action is announced through one live region.
 - **Reading support:** a high-contrast theme, text up to 200%, the Atkinson Hyperlegible and OpenDyslexic fonts, relaxed spacing, a stacked layout for screen magnifiers, and replies read aloud for people who don't use a screen reader.
 - **Motion with a purpose, and an off switch:** cards glide when they move so sighted teammates can see what changed. Everything turns off with the system's reduced-motion setting or Handrail's own setting.
@@ -98,7 +98,7 @@ Needs Node.js 24.
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm test             # 136 unit and property-based tests (Vitest, fast-check)
+npm test             # 138 unit and property-based tests (Vitest, fast-check)
 npm run test:e2e     # 63 browser tests (Playwright), including the axe accessibility audit
 npm run build        # static site in dist/
 ```

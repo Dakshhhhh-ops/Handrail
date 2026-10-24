@@ -10,7 +10,7 @@ The technical detail behind the [README](../README.md).
 - **Low vision and dyslexia:** high-contrast theme, text up to 200%, Atkinson Hyperlegible or OpenDyslexic fonts, relaxed spacing, a stacked layout for screen magnifiers, and replies read aloud for people who don't use a screen reader.
 - **Mouse users:** normal drag-and-drop still works, so mixed groups can share one board.
 - **Motion with a purpose:** cards glide when they move (so sighted teammates see what changed), and the front page is a 1-minute scroll story with a 3D board (GSAP, ScrollTrigger, Lenis). It shows once per visit, and "Open the board" is the first thing you reach by Tab. All of it turns off with the system's reduced-motion setting or Handrail's own "Turn off animations", and the story has a Pause button.
-- **Works offline and installs like an app:** a service worker keeps a copy, so once opened Handrail works without a connection.
+- **Works offline and installs like an app:** on the first visit, a service worker caches the app and every file it uses, so from then on Handrail opens and works without a connection.
 - **Groups already on Trello:** connect once (read-only) and Handrail reads the board each time it opens, or import a Trello JSON export. Export as a backup or as plain text (CSV is in Labs).
 - **First-time visitors:** a five-step quick tour highlights each part of the screen. It's a native dialog, so it works by keyboard and screen reader, and it's in Help any time.
 
@@ -59,7 +59,7 @@ flowchart LR
 
 - **React 18 + TypeScript + Vite**, a static site with no backend. `src/model/` is plain TypeScript with no UI code, so it is unit-tested.
 - **CRDT document** (`crdt.ts`). Every field is a last-writer-wins register holding the value, a Lamport clock, the wall-clock time, the writing device and the writer's name. Merging keeps the winning write per register, ordered by (clock, time, device, value). That merge is commutative, associative and idempotent, so copies converge whatever order links arrive in.
-  - Card order uses **fractional indexing** (copied from rocicorp/fractional-indexing, the approach Figma and Linear describe). A commit keeps the keys of the longest increasing run of cards that didn't move, so a move rewrites one register.
+  - Card order uses **fractional indexing** (the `fractional-indexing` library by Rocicorp, the approach Figma and Linear describe). A commit keeps the keys of the longest increasing run of cards that didn't move, so a move rewrites one register.
   - `findConflicts` spots fields two people changed without seeing each other's write, so the app can explain what it kept.
 - **Per-action undo** (`revert.ts`). Undo puts back only what your action changed, and only where the board still shows your result, so a teammate's edits that merged in since are kept. Undoing a delete brings the card back with its newest content, including edits a teammate made after you deleted it, and Escape while carrying a card puts back only that card.
 - **The digest** (`diff.ts`, `summary.ts`). It compares the board you last saw with the merged one, credits each change from the register's author, and folds the changes into short sentences grouped by person, with what involves you first. The spoken version gives the count and the first sentence; "more" reads the rest.
@@ -74,11 +74,11 @@ flowchart LR
   - Size caps, and a bounded decompressor so a tiny link can't expand into gigabytes.
   - Names reserved by JavaScript objects are rejected.
   - Clocks and version vectors are derived from the writes themselves, and implausible clocks are refused.
-- **Testing:** 136 Vitest tests and 63 Playwright tests.
+- **Testing:** 138 Vitest tests and 63 Playwright tests.
   - Property-based tests (fast-check) generate hundreds of random three-person edit-and-swap histories and check that everyone ends up with the same, well-formed board.
   - Browser tests cover two people merging concurrent edits, keyboard-only use, the Trello connection (against a fake Trello), and a real two-browser live session (run locally; it needs the public relays, so CI skips it).
   - **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog and at phone width, with zero violations. Layout tests check 200% text at 320, 768 and 1280 px.
-  - **NVDA:** we recorded the app with the real NVDA screen reader and read its speech log; that found five problems the audit missed, all fixed.
+  - **NVDA:** we recorded the app with the real NVDA screen reader and read its speech log; that found four problems the audit missed, all fixed.
 
 ## Privacy
 
