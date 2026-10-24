@@ -8,7 +8,7 @@ Handrail is a project board for group work. When your teammates change things, i
 
 **[Open Handrail](https://dakshhhhh-ops.github.io/Handrail/?board)** · **[Try it with your eyes closed](https://dakshhhhh-ops.github.io/Handrail/?blindfold)** · [How it works](docs/HOW-IT-WORKS.md) · [Evidence of the problem](docs/EVIDENCE.md)
 
-No account, no install, no server. It runs in the browser and keeps your boards on your device.
+No account, no install, no server. It runs in the browser, keeps your boards on your device, and works offline after the first visit.
 
 ![Handrail on a first visit: a "New here?" line, the board with changed cards tagged with who changed them, and the Activity panel: "Since you last looked: 4 changes, 1 for you", a plain-sentence summary and the next step "Draft the outline"](docs/changes.png)
 
