@@ -408,6 +408,12 @@ test.describe('activity panel', () => {
     await expect(live(page)).toContainText('This is how the board looked before');
     await page.keyboard.press('Alt+ArrowRight');
     await expect(cardIn(page, 'To do', 'Design slides')).toBeVisible();
+    // Column controls are gone, and commands can't change anything either.
+    await expect(page.getByRole('button', { name: /Options for column/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Add column' })).toHaveCount(0);
+    await run(page, 'add column Later');
+    await expect(live(page)).toContainText('Choose “Show now” first');
+    await expect(page.getByTestId('column-Later')).toHaveCount(0);
     await page.getByRole('button', { name: 'Show now' }).click();
     await expect(cardIn(page, 'Done', 'Design slides')).toBeVisible();
     await expect(toggle).toHaveAttribute('aria-pressed', 'false');
@@ -845,11 +851,10 @@ test.describe('the story (first visit)', () => {
   }
 });
 
-test('works offline once opened, and says so', async ({ page, context }) => {
+test('works offline straight after the first visit, and says so', async ({ page, context }) => {
+  // No second online visit: the worker caches the app's files when it installs.
   await page.evaluate(() => navigator.serviceWorker.ready);
-  // Let the service worker take control and cache the built files.
-  await page.reload();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+  await page.waitForTimeout(500);
   await context.setOffline(true);
   await expect(page.locator('.status-pill')).toHaveText(/Offline · everything still works/);
   await page.reload();

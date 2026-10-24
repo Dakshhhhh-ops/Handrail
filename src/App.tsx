@@ -91,6 +91,17 @@ export default function App() {
   const [newHere, setNewHere] = useState(isNewHere);
   const [arrived, setArrived] = useState(false);
   const store = useHandrail();
+
+  // Display settings apply everywhere, the story page included (theme, text size, font, motion).
+  const { settings } = store;
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.theme = settings.theme;
+    root.dataset.font = settings.font;
+    root.dataset.spacing = settings.spacing;
+    root.dataset.motion = settings.reduceMotion ? 'reduce' : 'auto';
+    root.style.fontSize = `${settings.textSize}%`;
+  }, [settings]);
   const enter = useCallback(() => {
     try {
       localStorage.setItem(STORY_SEEN, '1');
@@ -273,16 +284,6 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
     return () => window.clearTimeout(t);
   }, [highlightId]);
 
-  // ---- Display settings ----------------------------------------------------
-  useEffect(() => {
-    const root = document.documentElement;
-    root.dataset.theme = settings.theme;
-    root.dataset.font = settings.font;
-    root.dataset.spacing = settings.spacing;
-    root.dataset.motion = settings.reduceMotion ? 'reduce' : 'auto';
-    root.style.fontSize = `${settings.textSize}%`;
-  }, [settings]);
-
   useEffect(() => {
     if (compact) document.documentElement.dataset.compact = '';
     else delete document.documentElement.dataset.compact;
@@ -436,7 +437,7 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
 
   useEffect(() => {
     entrance(document.querySelector<HTMLElement>('main'));
-    if (firstVisit) {
+    if (firstVisit && !blindfold) {
       // First visit: the teammates' changes are waiting; the arrival flow announces them and moves focus there.
       simulateTeammates();
     } else if (arrived) {
@@ -533,6 +534,11 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
       const next = nextStep(board, me, today, store.changes);
       reply = next ? next.text : me ? 'Nothing open is assigned to you. Say “my tasks” or “summary” to look around.' : 'Set your name in Settings first, so Handrail knows which cards are yours.';
       if (next) focusCardLater(next.cardId);
+    }
+    // The Before view is read-only: commands can read and find, but not change anything.
+    if (r.board && showBefore && before) {
+      reply = 'This is how the board looked before. Choose “Show now” first, then try again.';
+      r.board = undefined;
     }
     if (r.board) store.apply(r.board, r.label ?? 'change');
     if (reply && r.effect !== 'undo' && r.effect !== 'redo') announce(reply);

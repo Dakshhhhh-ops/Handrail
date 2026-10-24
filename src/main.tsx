@@ -15,7 +15,16 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Works offline once it has been opened: the service worker keeps a copy of the app.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    // Tell the worker which files this visit loaded (lazy parts, fonts), so they're cached too.
+    const send = () => navigator.serviceWorker.ready.then((reg) => {
+      const urls = performance.getEntriesByType('resource').map((e) => e.name).filter((u) => u.startsWith(location.origin));
+      reg.active?.postMessage({ type: 'cache', urls });
+    });
+    send().catch(() => {});
+    window.setTimeout(() => send().catch(() => {}), 8000);
+  });
 }
 
 createRoot(document.getElementById('root')!).render(

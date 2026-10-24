@@ -453,7 +453,7 @@ export function BoardView({
                   <span className="sr-only"> {col.cardIds.length === 1 ? 'card' : 'cards'}{filtered ? ' shown' : ''}</span>
                 </span>
               </h2>
-              <button type="button" className="btn btn-quiet icon-only" onClick={() => cb.openColumn(col.id)} aria-label={`Options for column ${col.title}`}>
+              <button type="button" className="btn btn-quiet icon-only" onClick={() => cb.openColumn(col.id)} aria-label={`Options for column ${col.title}`} hidden={readOnly}>
                 <MoreIcon size={20} />
               </button>
             </div>
@@ -532,7 +532,7 @@ export function BoardView({
           </section>
         );
       })}
-      <div className="column column-add">
+      <div className="column column-add" hidden={readOnly}>
         <button type="button" className="btn btn-ghost" onClick={cb.addColumn} title="Add column">
           <PlusIcon size={16} /> <span className="add-col-label">Add column</span>
         </button>
