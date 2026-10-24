@@ -1,3 +1,4 @@
+import type { CardAuthors } from './model/crdt';
 import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   addCard, addColumn, deleteCard, deleteColumn, doneColumn, locate, moveCard, moveColumn, peopleOn, renameBoard, renameColumn, updateCard,
@@ -13,7 +14,7 @@ import { nextStep } from './model/next';
 import { findColumn, findPerson } from './model/match';
 import { demoBoard } from './model/seed';
 import { TRELLO_SOMEONE, importTrello, trelloAuthors } from './model/importers';
-import { fetchBoard, loadLink, saveLink, tokenFromHash } from './lib/trello';
+import { fetchBoard, loadLink, saveLink, tokenFromHash, whoAmI } from './lib/trello';
 import { docFromHash, parseHash } from './model/share';
 import { materialize } from './model/crdt';
 import type { Board } from './model/types';
@@ -663,6 +664,16 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
       openDialog('boards');
       announce('Connected to Trello, read-only. Choose a board to follow.');
+      // Use the name Trello has for you, so cards assigned to you there count as yours here.
+      whoAmI(loadLink())
+        .then((m) => {
+          const name = (m.fullName || m.username || '').trim().slice(0, 60);
+          if (name && name !== store.settings.name) {
+            store.updateSettings({ name });
+            announce(`Connected to Trello as ${name}, read-only. Choose a board to follow.`);
+          }
+        })
+        .catch(() => { /* the name can still be set in Settings */ });
       return;
     }
     // Followed boards are checked each time Handrail opens.
@@ -674,7 +685,7 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function importBoard(b: Board, source: string, authors?: Record<string, string>) {
+  function importBoard(b: Board, source: string, authors?: Record<string, CardAuthors>) {
     setDialog(null);
     if (authors) {
       const r = store.importTrello(b, authors, TRELLO_SOMEONE);

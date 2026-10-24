@@ -1,6 +1,7 @@
 import { createBoard, newId } from './board';
 import { describeDue, isISODate } from './dates';
 import { validateBoard } from './validate';
+import type { CardAuthors } from './crdt';
 import type { Board, Card } from './types';
 
 /**
@@ -65,26 +66,61 @@ function trelloId(prefix: string, id: unknown): string {
 }
 
 /**
- * Who last touched each card, from the activity log Trello includes in its export
- * (the newest action per card wins). Used to credit changes on a re-import.
+ * Who made each kind of change to each card, from the activity log Trello includes in its
+ * export (and API). Credit is per field: a move goes to whoever moved the card, a rename to
+ * whoever renamed it, and so on, newest first. Comments don't count, so someone commenting
+ * on a card isn't credited with another person's move. Changes the log doesn't cover fall
+ * back to the caller's default ("Someone in Trello") rather than a guess.
  */
-export function trelloAuthors(raw: unknown): Record<string, string> {
-  const byCard: Record<string, string> = {};
+export function trelloAuthors(raw: unknown): Record<string, CardAuthors> {
+  const out: Record<string, CardAuthors> = {};
   const when: Record<string, string> = {};
   const actions = raw && typeof raw === 'object' && Array.isArray((raw as { actions?: unknown }).actions)
     ? ((raw as { actions: unknown[] }).actions)
     : [];
+  const credit = (id: string, field: keyof CardAuthors, who: string, at: string) => {
+    const k = `${id}:${field}`;
+    if (when[k] !== undefined && at < when[k]) return;
+    when[k] = at;
+    (out[id] ??= {})[field] = who;
+  };
   for (const a of actions.slice(0, 5000)) {
     if (!a || typeof a !== 'object') continue;
-    const act = a as { date?: unknown; memberCreator?: { fullName?: unknown; username?: unknown }; data?: { card?: { id?: unknown } } };
+    const act = a as {
+      type?: unknown; date?: unknown; memberCreator?: { fullName?: unknown; username?: unknown };
+      data?: { card?: { id?: unknown }; old?: Record<string, unknown> };
+    };
     const who = String(act.memberCreator?.fullName || act.memberCreator?.username || '').trim().slice(0, 60);
     const at = typeof act.date === 'string' ? act.date : '';
     const cardId = act.data?.card?.id;
     if (!who || typeof cardId !== 'string') continue;
     const id = trelloId('tc', cardId);
-    if (!when[id] || at >= when[id]) { byCard[id] = who; when[id] = at; }
+    switch (act.type) {
+      case 'createCard':
+      case 'copyCard':
+      case 'moveCardToBoard':
+      case 'convertToCardFromCheckItem':
+        credit(id, 'any', who, at);
+        break;
+      case 'addMemberToCard':
+      case 'removeMemberFromCard':
+        credit(id, 'assignee', who, at);
+        break;
+      case 'updateCard': {
+        const old = act.data?.old ?? {};
+        if ('idList' in old || 'pos' in old) credit(id, 'place', who, at);
+        if ('name' in old) credit(id, 'title', who, at);
+        if ('desc' in old) credit(id, 'notes', who, at);
+        if ('due' in old) credit(id, 'due', who, at);
+        if ('closed' in old) credit(id, 'alive', who, at);
+        break;
+      }
+      default:
+        // Comments, attachments, checklists and the rest don't change anything Handrail shows.
+        break;
+    }
   }
-  return byCard;
+  return out;
 }
 
 /** Credited for Trello changes that its activity log doesn't cover. */

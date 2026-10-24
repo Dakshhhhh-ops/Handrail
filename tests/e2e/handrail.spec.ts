@@ -45,8 +45,8 @@ test.describe('works on top of Trello', () => {
       id: 'B1', name: 'Bio lab', lists,
       cards: [{ id: 'c1', name: 'Write method', idList: 'L2', pos: 1 }, { id: 'c2', name: 'Abstract', idList: 'L1', pos: 1 }],
       actions: [
-        { date: '2026-10-22T10:00:00.000Z', memberCreator: riya, data: { card: { id: 'c2' } } },
-        { date: '2026-10-22T09:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' } } },
+        { type: 'createCard', date: '2026-10-22T10:00:00.000Z', memberCreator: riya, data: { card: { id: 'c2' } } },
+        { type: 'updateCard', date: '2026-10-22T09:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' }, old: { idList: 'L1' } } },
       ],
     }));
     await expect(live(page)).toContainText('Updated “Bio lab” from Trello. 2 changes since your last import.');
@@ -84,13 +84,14 @@ test('connects to Trello directly, follows a board, and says what changed there 
     return route.fulfill({ status: 302, headers: { location: `${back}#token=${token}` } });
   });
   await page.route('https://api.trello.com/1/members/me/boards**', (route) => route.fulfill({ json: [{ id: 'B1aaaaaaaa', name: 'Bio lab' }] }));
+  await page.route(/https:\/\/api\.trello\.com\/1\/members\/me\?/, (route) => route.fulfill({ json: { fullName: 'Priya Sharma', username: 'priyas' } }));
   await page.route('https://api.trello.com/1/boards/B1aaaaaaaa**', (route) => route.fulfill({ json: trelloBoard }));
 
   await page.locator('#board-switcher').click();
   const files = page.getByRole('dialog', { name: 'Boards & files' });
   await files.getByLabel('Trello API key').fill(key);
   await files.getByRole('button', { name: 'Connect Trello' }).click();
-  await expect(live(page)).toContainText('Connected to Trello, read-only');
+  await expect(live(page)).toContainText('Connected to Trello as Priya Sharma, read-only');
   await expect(files.getByLabel('Follow a board')).toHaveValue('B1aaaaaaaa');
   await files.getByRole('button', { name: 'Follow', exact: true }).click();
   await expect(live(page)).toContainText('Imported “Bio lab” from Trello');
@@ -99,7 +100,7 @@ test('connects to Trello directly, follows a board, and says what changed there 
   trelloBoard = {
     ...trelloBoard,
     cards: [{ id: 'c1', name: 'Write method', idList: 'L2', pos: 1 }],
-    actions: [{ date: '2026-10-22T09:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' } } }],
+    actions: [{ type: 'updateCard', date: '2026-10-22T09:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' }, old: { idList: 'L1' } } }],
   };
   await page.reload();
   await expect(live(page)).toContainText('Checked Trello: 1 change on “Bio lab” since you last looked.');

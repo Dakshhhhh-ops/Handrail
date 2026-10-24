@@ -5,8 +5,19 @@ import type { Board, Card, Column } from './types';
 
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
+/**
+ * Whether two names are the same person. A first name on its own matches a full name that
+ * starts with it ("Priya" and "Priya Sharma"), since Trello uses full names and people often
+ * give Handrail just their first name. Two different full names never match.
+ */
 export function sameName(a: string | null, b: string | null): boolean {
-  return !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  if (!a || !b) return false;
+  const x = a.trim().toLowerCase().replace(/\s+/g, ' ');
+  const y = b.trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const [short, long] = x.length <= y.length ? [x, y] : [y, x];
+  return !short.includes(' ') && long.startsWith(`${short} `);
 }
 
 export function whoLabel(name: string | null, me: string | null): string {

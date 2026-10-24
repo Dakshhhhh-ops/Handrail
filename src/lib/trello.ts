@@ -64,6 +64,11 @@ async function get<T>(path: string, link: TrelloLink, params: Record<string, str
   return (await r.json()) as T;
 }
 
+/** Your own Trello name, so cards assigned to you there count as yours here. */
+export function whoAmI(link: TrelloLink): Promise<{ fullName?: string; username?: string }> {
+  return get('members/me', link, { fields: 'fullName,username' });
+}
+
 export function listBoards(link: TrelloLink): Promise<{ id: string; name: string }[]> {
   return get('members/me/boards', link, { filter: 'open', fields: 'name' });
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
-import { commit, docFromBoard, findConflicts, materialize, mergeDocs, plausible, validateDoc, type Doc } from '../model/crdt';
+import { commit, docFromBoard, type CardAuthors, findConflicts, materialize, mergeDocs, plausible, validateDoc, type Doc } from '../model/crdt';
 import { describeConflicts, diffBoards, type Change } from '../model/diff';
 import { newId } from '../model/board';
 import { demoBoard, demoTeammateEdits } from '../model/seed';
@@ -90,7 +90,7 @@ type Action =
   | { type: 'simulate' }
   | { type: 'switch'; id: string }
   | { type: 'deleteBoard'; id: string }
-  | { type: 'importTrello'; board: Board; byCard: Record<string, string>; by: string | null; open: boolean | 'ifChanged' }
+  | { type: 'importTrello'; board: Board; byCard: Record<string, CardAuthors>; by: string | null; open: boolean | 'ifChanged' }
   | { type: 'settings'; patch: Partial<Settings> };
 
 const KEY = 'handrail:v1';
@@ -306,7 +306,7 @@ function created(saved: Saved, board: Board, made?: Doc): Saved {
  * Edits made in Handrail in between are kept unless Trello changed the same thing.
  */
 export function importFromTrello(
-  saved: Saved, board: Board, byCard: Record<string, string>, by: string | null,
+  saved: Saved, board: Board, byCard: Record<string, CardAuthors>, by: string | null,
   /** Switch to the board afterwards: always, or only if Trello changed something (for background checks). */
   open: boolean | 'ifChanged' = true,
 ): { saved: Saved; fresh: Change[]; updated: boolean } {
@@ -487,7 +487,7 @@ export function useHandrail() {
     isPlausible: (d: Doc) => plausible(saved.docs[d.id], d),
     createBoard: useCallback((b: Board) => dispatch({ type: 'create', board: b }), []),
     /** Imports a Trello export and says whether it updated a board imported before, and how many changes it found. */
-    importTrello: (b: Board, byCard: Record<string, string>, by: string | null, open: boolean | 'ifChanged' = true) => {
+    importTrello: (b: Board, byCard: Record<string, CardAuthors>, by: string | null, open: boolean | 'ifChanged' = true) => {
       const r = importFromTrello(saved, b, byCard, by, open);
       dispatch({ type: 'importTrello', board: b, byCard, by, open });
       return { updated: r.updated, changes: r.fresh.length };

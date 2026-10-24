@@ -1,3 +1,4 @@
+import type { CardAuthors } from '../model/crdt';
 import { TrelloConnect } from './TrelloConnect';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { createBoard } from '../model/board';
@@ -315,7 +316,7 @@ export function BoardsDialog({
   onSwitch: (id: string) => void;
   onCreate: (b: Board) => void;
   onDelete: (id: string) => void;
-  onImported: (b: Board, source: string, authors?: Record<string, string>) => void;
+  onImported: (b: Board, source: string, authors?: Record<string, CardAuthors>) => void;
   onTeammateDemo: () => void;
   onResetDemo: () => void;
   onRename: (title: string) => void;

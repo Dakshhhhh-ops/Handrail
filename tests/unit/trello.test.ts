@@ -20,7 +20,7 @@ const firstExport = {
     { id: 'c2', name: 'Graphs', idList: 'L1', pos: 2 },
     { id: 'c3', name: 'Poster', idList: 'L2', pos: 1 },
   ],
-  actions: [{ date: '2026-10-20T09:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' } } }],
+  actions: [{ type: 'createCard', date: '2026-10-20T09:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' } } }],
 };
 
 // A week later in Trello: Riya started the method and added an abstract; Arjun renamed the graphs and archived the poster.
@@ -32,12 +32,14 @@ const laterExport = {
     { id: 'c3', name: 'Poster', idList: 'L2', pos: 1, closed: true },
     { id: 'c4', name: 'Abstract', idList: 'L1', pos: 3 },
   ],
+  // Newest first, as Trello lists them.
   actions: [
-    { date: '2026-10-27T10:00:00.000Z', memberCreator: riya, data: { card: { id: 'c4' } } },
-    { date: '2026-10-26T15:00:00.000Z', memberCreator: arjun, data: { card: { id: 'c3' } } },
-    { date: '2026-10-26T14:00:00.000Z', memberCreator: arjun, data: { card: { id: 'c2' } } },
-    { date: '2026-10-25T09:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' } } },
-    { date: '2026-10-20T09:00:00.000Z', memberCreator: arjun, data: { card: { id: 'c1' } } },
+    { type: 'commentCard', date: '2026-10-27T11:00:00.000Z', memberCreator: arjun, data: { card: { id: 'c1' }, text: 'Looks good' } },
+    { type: 'createCard', date: '2026-10-27T10:00:00.000Z', memberCreator: riya, data: { card: { id: 'c4' } } },
+    { type: 'updateCard', date: '2026-10-26T15:00:00.000Z', memberCreator: arjun, data: { card: { id: 'c3' }, old: { closed: false } } },
+    { type: 'updateCard', date: '2026-10-26T14:00:00.000Z', memberCreator: arjun, data: { card: { id: 'c2' }, old: { name: 'Graphs' } } },
+    { type: 'updateCard', date: '2026-10-25T09:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' }, old: { idList: 'L1' } } },
+    { type: 'updateCard', date: '2026-10-20T09:00:00.000Z', memberCreator: arjun, data: { card: { id: 'c1' }, old: { desc: '' } } },
   ],
 };
 
@@ -59,9 +61,39 @@ describe('Trello re-import', () => {
     expect(Object.keys(b.cards)).toContain('tc-c1');
   });
 
-  it('credits each card to whoever touched it last in Trello', () => {
-    expect(trelloAuthors(laterExport)).toEqual({ 'tc-c1': 'Riya Sharma', 'tc-c2': 'Arjun Rao', 'tc-c3': 'Arjun Rao', 'tc-c4': 'Riya Sharma' });
+  it('credits each kind of change to whoever made it in Trello, ignoring comments', () => {
+    expect(trelloAuthors(laterExport)).toEqual({
+      'tc-c1': { place: 'Riya Sharma', notes: 'Arjun Rao' },
+      'tc-c2': { title: 'Arjun Rao' },
+      'tc-c3': { alive: 'Arjun Rao' },
+      'tc-c4': { any: 'Riya Sharma' },
+    });
     expect(trelloAuthors({ lists: [], cards: [] })).toEqual({});
+  });
+
+  it('a later comment doesn’t take credit for someone else’s move', () => {
+    const first = load(emptySaved(), firstExport);
+    const later = {
+      ...firstExport,
+      cards: [{ id: 'c1', name: 'Write method', idList: 'L2', pos: 1 }, ...firstExport.cards.slice(1)],
+      actions: [
+        { type: 'commentCard', date: '2026-10-26T10:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' }, text: 'Nice' } },
+        { type: 'updateCard', date: '2026-10-25T10:00:00.000Z', memberCreator: arjun, data: { card: { id: 'c1' }, old: { idList: 'L1' } } },
+      ],
+    };
+    expect(load(first.saved, later).fresh.map((c) => c.text)).toEqual(['Arjun Rao moved “Write method” from To Do to Doing.']);
+  });
+
+  it('matches Priya to her full Trello name, so changes for her are marked “for you”', () => {
+    const withPriya = { ...firstExport, members: [...members, { id: 'm3', fullName: 'Priya Sharma' }] };
+    const first = load(emptySaved(), withPriya);
+    const later = {
+      ...withPriya,
+      cards: [{ ...withPriya.cards[0], idMembers: ['m3'] }, ...withPriya.cards.slice(1)],
+      actions: [{ type: 'addMemberToCard', date: '2026-10-26T10:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' } } }],
+    };
+    const fresh = load(first.saved, later).fresh;
+    expect(fresh[0]).toMatchObject({ forYou: true, text: 'Riya Sharma assigned “Write method” to you.' });
   });
 
   it('credits changes the activity log doesn’t cover to “Someone in Trello”', () => {
