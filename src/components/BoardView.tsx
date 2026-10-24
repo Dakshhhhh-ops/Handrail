@@ -175,6 +175,20 @@ export function BoardView({
     return () => document.removeEventListener('focusin', onFocusIn);
   });
 
+  // A carried card is rebuilt in its new column, so for a moment nothing has focus. Keys
+  // pressed in that gap (quick arrows, Escape, Enter) still belong to the carried card.
+  useEffect(() => {
+    if (!grab) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t !== document.body && t !== document.documentElement) return;
+      if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' ', 'Escape'].includes(e.key)) return;
+      onCardKey(e as unknown as KeyboardEvent<HTMLButtonElement>, grab.cardId);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
+
   function drop() {
     if (!grab) return;
     const card = board.cards[grab.cardId];
