@@ -82,7 +82,7 @@ Priya's group already lives in Trello, and they won't move for one person. They 
 
 ## Limitations
 
-- **Not yet tested with blind or motor-impaired users.** We tested it ourselves with NVDA (we are sighted). Five sighted classmates also tried the eyes-closed challenge on 24 October 2026; we didn't record their times. That is not the same as blind users saying it works. Sessions with screen-reader users are the next step.
+- **Not yet tested with blind or motor-impaired users.** We tested it ourselves with NVDA (we are sighted). That is not the same as blind users saying it works. Sessions with screen-reader users are the next step.
 - **Screen-reader focus mode isn't re-verified.** The board is marked as an application so screen readers switch to focus mode on a card; this follows the documented behaviour of NVDA and JAWS but hasn't been re-recorded with NVDA since the change. In browse mode, Enter on a card (the menu) and the command box still work.
 - **Trello is read-only and checked when Handrail opens.** It isn't a live feed, and changes made in Handrail don't go back to Trello. Changes that Trello's activity log doesn't cover are credited to "Someone in Trello". Handrail has one assignee per card, so a Trello card with several members shows the first. Trello's sign-in token lasts 30 days.
 - **Without Trello, changes arrive by link.** A teammate has to send a newer link, so it's a catch-up rather than a live feed. Live sessions (in Labs) need everyone online at once and use public relays, which some school networks block.
