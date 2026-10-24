@@ -5,6 +5,17 @@ import { daysUntil, describeDue, parseDue } from '../../src/model/dates';
 const today = new Date(2026, 9, 22);
 
 describe('parseDue', () => {
+  it('reads “next <day>” as next week’s day, also at the weekend', () => {
+    const sat = new Date(2026, 9, 24); // Saturday 24 October
+    const sun = new Date(2026, 9, 25);
+    const wed = new Date(2026, 9, 21);
+    expect(parseDue('next friday', sat)).toBe('2026-10-30');
+    expect(parseDue('next friday', sun)).toBe('2026-10-30');
+    expect(parseDue('next monday', sat)).toBe('2026-10-26');
+    expect(parseDue('next friday', wed)).toBe('2026-10-30');
+    expect(parseDue('next wednesday', wed)).toBe('2026-10-28');
+  });
+
   it.each([
     ['today', '2026-10-22'],
     ['tomorrow', '2026-10-23'],

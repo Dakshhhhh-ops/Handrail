@@ -104,7 +104,13 @@ export function parseDue(input: string, today: Date): string | null {
     const wd = weekdayIndex(m[2]);
     if (wd >= 0) {
       let delta = (wd - today.getDay() + 7) % 7;
-      if (m[1]?.trim() === 'next') delta = (delta === 0 ? 7 : delta) + 7;
+      if (m[1]?.trim() === 'next') {
+        // "next friday" is the Friday of next week (weeks run Monday to Sunday). On a weekend,
+        // that's the coming Friday; earlier in the week it skips this week's Friday.
+        const upcoming = delta === 0 ? 7 : delta;
+        const daysLeftThisWeek = (7 - today.getDay()) % 7; // Sunday ends the week
+        delta = upcoming <= daysLeftThisWeek ? upcoming + 7 : upcoming;
+      }
       return toISODate(addDays(today, delta));
     }
   }
