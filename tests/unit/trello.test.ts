@@ -144,3 +144,16 @@ describe('Trello re-import', () => {
     expect(again.fresh).toEqual([]);
   });
 });
+
+describe('Trello connection', () => {
+  it('asks Trello for read-only access and reads the token it sends back', async () => {
+    const { authorizeUrl, tokenFromHash } = await import('../../src/lib/trello');
+    const url = new URL(authorizeUrl('abcdef123456', 'https://example.org/Handrail/?board'));
+    expect(url.origin + url.pathname).toBe('https://trello.com/1/authorize');
+    expect(url.searchParams.get('scope')).toBe('read');
+    expect(url.searchParams.get('return_url')).toBe('https://example.org/Handrail/?board');
+    expect(tokenFromHash(`#token=${'a1'.repeat(32)}`)).toBe('a1'.repeat(32));
+    expect(tokenFromHash('#board=v2.abc')).toBeNull();
+    expect(tokenFromHash('#token=<script>')).toBeNull();
+  });
+});

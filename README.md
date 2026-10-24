@@ -13,7 +13,7 @@
 
 Handrail does one job: **telling you what your teammates changed, when you can't scan the board.** Everything in the main app serves one loop:
 
-1. **Changes arrive:** a teammate's link, or a newer Trello export.
+1. **Changes arrive:** from the group's Trello board each time Handrail opens, or from a teammate's link.
 2. **Handrail says what changed,** in plain sentences, with what involves you first.
 3. **You know your next step, and act on it without dragging:** Handrail names the one card to do next, and you use keys, a menu, or a typed or spoken sentence. Undo anything.
 
@@ -41,7 +41,7 @@ This isn't hypothetical. Trello has open NVDA bugs with "no known workaround", J
 
 ### Nobody has to switch from Trello
 
-Priya's group already lives in Trello, and they won't move for one person. They don't have to. Priya exports the Trello board as JSON and imports it. Next time she imports the newer export, Handrail compares it with the last one and tells her what changed **in Trello**, credited from Trello's own activity log: *"Riya Sharma moved 'Write method' from To Do to Doing."* Her teammates keep using Trello; Handrail is how Priya reads it.
+Priya's group already lives in Trello, and they won't move for one person. They don't have to. In **Boards & files → Connect Trello**, Priya signs in to Trello once (read-only) and follows the group's board. Every time she opens Handrail, it reads the board from Trello and tells her what changed **in Trello** since she last looked, credited from Trello's own activity log: *"Riya Sharma moved 'Write method' from To Do to Doing."* Nothing to export, and her teammates never change tools. (Importing a Trello JSON export still works too, for anyone without a connection.)
 
 Trello ids are kept, so a re-import updates the same board instead of making a copy. Trello's last export is stored as its own copy of the document, and a re-import is merged like a teammate's link. Only what changed in Trello is applied. Cards Priya added or moved in Handrail in between stay as she left them, unless Trello changed the same card, in which case Trello's newer change wins and she is told.
 
@@ -69,22 +69,22 @@ Trello ids are kept, so a re-import updates the same board instead of making a c
 ## Limitations
 
 - **Not yet tested with blind or motor-impaired users.** We tested it ourselves with NVDA (we are sighted), which found five problems the automated audit missed; all are fixed. The design follows WCAG 2.2 and the WAI-ARIA Authoring Practices. That is still not the same as blind users saying it works. The next step is sessions with screen-reader users.
-- **Getting changes in still takes a step.** A teammate has to send a newer link, or Priya re-imports a newer Trello export. Nobody sends a link after every edit, so in practice this is a catch-up after a few days, not a live feed. Live sessions (Labs) remove the step but need everyone online at once.
+- **Without Trello, getting changes in takes a step.** A teammate has to send a newer link. Nobody sends a link after every edit, so this is a catch-up, not a live feed. Groups on Trello don't need the step: Handrail reads their board each time it opens.
 - **Screen reader modes.** The board is marked as an application, so screen readers should switch to focus mode when you land on a card, and arrows, Space and number keys reach Handrail. This follows the documented behaviour of NVDA and JAWS but hasn't been re-recorded with NVDA since the change. If a screen reader stays in browse mode, it keeps those keys for itself. Enter on a card (the action menu) and the command box work in either mode, and Help explains this.
 - **Share links grow with the board.** The sample board's link is about 2,000 characters, around Discord's message limit. Long links work in email and most chat apps, and "Download backup" works for any size.
 - **Live sessions need both people online at once**, and use public relays to connect. Some strict school or office networks block peer-to-peer connections; share links still work there. There is no always-on sync server, so a teammate who is offline catches up when they open a newer link.
 - **Merging picks a winner per field.** If two people edit the same field at the same moment, one version is kept (the later one) and the other person is told; the text isn't combined.
 - **Voice input** depends on the browser's speech recognition (Chrome and Edge, online). Typing commands works everywhere.
 - **English only** for commands and dates.
-- **Trello updates are manual.** Priya exports and re-imports the board; there is no Trello API connection. Changes Trello's activity log doesn't cover are credited to "Someone in Trello", and changes made in Handrail don't flow back to Trello. Handrail has one assignee per card, so a Trello card with several members shows the first.
+- **Trello is read-only, and checked when Handrail opens.** It isn't a live feed, and changes made in Handrail don't flow back to Trello. The connection needs a Trello API key built into the app (or pasted in once), and Trello's sign-in token lasts 30 days. Changes Trello's activity log doesn't cover are credited to "Someone in Trello", and changes made in Handrail don't flow back to Trello. Handrail has one assignee per card, so a Trello card with several members shows the first.
 
 ## Run it locally
 
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm test             # 133 unit and property-based tests
-npm run test:e2e     # 60 browser tests, including the axe accessibility audit
+npm test             # 134 unit and property-based tests
+npm run test:e2e     # 61 browser tests, including the axe accessibility audit
 npm run build        # static site in dist/
 ```
 

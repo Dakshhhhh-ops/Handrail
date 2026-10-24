@@ -12,7 +12,8 @@ import { summarize, summarySentences } from './model/summary';
 import { nextStep } from './model/next';
 import { findColumn, findPerson } from './model/match';
 import { demoBoard } from './model/seed';
-import { TRELLO_SOMEONE } from './model/importers';
+import { TRELLO_SOMEONE, importTrello, trelloAuthors } from './model/importers';
+import { fetchBoard, loadLink, saveLink, tokenFromHash } from './lib/trello';
 import { docFromHash, parseHash } from './model/share';
 import { materialize } from './model/crdt';
 import type { Board } from './model/types';
@@ -607,6 +608,72 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
     setDialog(null);
   }
 
+  // ---- Trello, read directly ------------------------------------------------------
+  async function followTrello(id: string): Promise<string> {
+    try {
+      const raw = await fetchBoard(loadLink(), id);
+      const b = importTrello(raw);
+      if (!b) return 'Trello sent something Handrail couldn’t read.';
+      importBoard(b, 'Trello', trelloAuthors(raw));
+      return `Following “${b.title}”.`;
+    } catch (e) {
+      return (e as Error).message;
+    }
+  }
+
+  /** Reads every followed Trello board again and says what changed since you last looked. */
+  async function syncTrello(manual: boolean): Promise<string> {
+    const link = loadLink();
+    if (!link.token || link.boards.length === 0) return 'No Trello boards to check.';
+    const found: string[] = [];
+    let total = 0;
+    for (const id of link.boards) {
+      try {
+        const raw = await fetchBoard(link, id);
+        const b = importTrello(raw);
+        if (!b) continue;
+        const r = store.importTrello(b, trelloAuthors(raw), TRELLO_SOMEONE, manual ? true : 'ifChanged');
+        if (r.changes) {
+          total += r.changes;
+          found.push(`${r.changes} ${r.changes === 1 ? 'change' : 'changes'} on “${b.title}”`);
+        }
+      } catch (e) {
+        if (manual) return (e as Error).message;
+        announce(`Couldn’t check Trello: ${(e as Error).message}`);
+        return '';
+      }
+    }
+    if (!total) {
+      if (manual) announce('Checked Trello. Nothing new since you last looked.');
+      return 'Nothing new in Trello since you last looked.';
+    }
+    const msg = `Checked Trello: ${found.join(', ')} since you last looked. Say “what changed” to hear them.`;
+    setDialog(null);
+    announce(msg);
+    if (wide) focusLater('changes-h');
+    else { lastFocus.current = null; setActivityOpen(true); }
+    return msg;
+  }
+
+  useEffect(() => {
+    // Back from Trello's sign-in page with a token: keep it, and offer the board picker.
+    const token = tokenFromHash(window.location.hash);
+    if (token) {
+      saveLink({ ...loadLink(), token });
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+      openDialog('boards');
+      announce('Connected to Trello, read-only. Choose a board to follow.');
+      return;
+    }
+    // Followed boards are checked each time Handrail opens.
+    const link = loadLink();
+    if (link.token && link.boards.length && !window.location.hash.startsWith('#board=')) {
+      const t = window.setTimeout(() => void syncTrello(false), 1200);
+      return () => window.clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function importBoard(b: Board, source: string, authors?: Record<string, string>) {
     setDialog(null);
     if (authors) {
@@ -981,6 +1048,8 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
         onCreate={(b) => { store.createBoard(b); setDialog(null); announce(`Created “${b.title}” with To do, Doing and Done.`); focusLater('command-input'); }}
         onDelete={(id) => { store.deleteBoard(id); setDialog(null); announce('Board deleted.'); focusLater('command-input'); }}
         onImported={importBoard}
+        onTrelloFollow={followTrello}
+        onTrelloSync={() => syncTrello(true)}
         onTeammateDemo={simulateTeammates}
         onRename={(title) => {
           store.apply(renameBoard(board, title), 'rename the board');

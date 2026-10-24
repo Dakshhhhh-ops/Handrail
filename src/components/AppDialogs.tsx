@@ -1,3 +1,4 @@
+import { TrelloConnect } from './TrelloConnect';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { createBoard } from '../model/board';
 import { exportCsv, exportJson, exportMarkdown, importCsv, importHandrailJson, importTrello, trelloAuthors } from '../model/importers';
@@ -300,8 +301,10 @@ function download(filename: string, text: string, type: string) {
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'board';
 
 export function BoardsDialog({
-  open, onClose, board, boards, today, onSwitch, onCreate, onDelete, onImported, onTeammateDemo, onResetDemo, onRename, labsCsv,
+  open, onClose, board, boards, today, onSwitch, onCreate, onDelete, onImported, onTeammateDemo, onResetDemo, onRename, labsCsv, onTrelloFollow, onTrelloSync,
 }: {
+  onTrelloFollow: (trelloBoardId: string) => Promise<string>;
+  onTrelloSync: () => Promise<string>;
   /** CSV import and export are a Labs extra. */
   labsCsv: boolean;
   open: boolean;
@@ -402,6 +405,7 @@ export function BoardsDialog({
           <p className="hint">New boards start with To do, Doing and Done.</p>
         </section>
 
+        <TrelloConnect open={open} onFollow={onTrelloFollow} onSyncNow={onTrelloSync} />
         <section aria-labelledby="b-import">
           <h3 id="b-import">Import</h3>
           <div className="field">

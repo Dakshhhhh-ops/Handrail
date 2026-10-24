@@ -72,6 +72,40 @@ test('Labs extras stay out of the way until switched on in Settings', async ({ p
   await expect(files.getByRole('button', { name: 'Download CSV' })).toBeVisible();
 });
 
+test('connects to Trello directly, follows a board, and says what changed there when Handrail opens again', async ({ page }) => {
+  const key = 'k'.repeat(32);
+  const token = 't'.repeat(64);
+  const lists = [{ id: 'L1', name: 'To Do', pos: 1 }, { id: 'L2', name: 'Doing', pos: 2 }];
+  const riya = { fullName: 'Riya Sharma' };
+  let trelloBoard: object = { id: 'B1aaaaaaaa', name: 'Bio lab', lists, cards: [{ id: 'c1', name: 'Write method', idList: 'L1', pos: 1 }], actions: [] };
+  // Trello's sign-in page sends you straight back with a token, as it does after you click Allow.
+  await page.route('https://trello.com/1/authorize**', (route) => {
+    const back = new URL(route.request().url()).searchParams.get('return_url')!;
+    return route.fulfill({ status: 302, headers: { location: `${back}#token=${token}` } });
+  });
+  await page.route('https://api.trello.com/1/members/me/boards**', (route) => route.fulfill({ json: [{ id: 'B1aaaaaaaa', name: 'Bio lab' }] }));
+  await page.route('https://api.trello.com/1/boards/B1aaaaaaaa**', (route) => route.fulfill({ json: trelloBoard }));
+
+  await page.locator('#board-switcher').click();
+  const files = page.getByRole('dialog', { name: 'Boards & files' });
+  await files.getByLabel('Trello API key').fill(key);
+  await files.getByRole('button', { name: 'Connect Trello' }).click();
+  await expect(live(page)).toContainText('Connected to Trello, read-only');
+  await expect(files.getByLabel('Follow a board')).toHaveValue('B1aaaaaaaa');
+  await files.getByRole('button', { name: 'Follow', exact: true }).click();
+  await expect(live(page)).toContainText('Imported “Bio lab” from Trello');
+
+  // Later, in Trello, Riya moves the card. Opening Handrail again is enough.
+  trelloBoard = {
+    ...trelloBoard,
+    cards: [{ id: 'c1', name: 'Write method', idList: 'L2', pos: 1 }],
+    actions: [{ date: '2026-10-22T09:00:00.000Z', memberCreator: riya, data: { card: { id: 'c1' } } }],
+  };
+  await page.reload();
+  await expect(live(page)).toContainText('Checked Trello: 1 change on “Bio lab” since you last looked.');
+  await expect(page.getByTestId('change-list')).toContainText('Riya Sharma moved “Write method” from To Do to Doing.');
+});
+
 test.describe('keyboard only', () => {
   test('found with NVDA: Ctrl+Z works from the empty command box, and the card key hint is read once', async ({ page }) => {
     await run(page, 'outline is done');

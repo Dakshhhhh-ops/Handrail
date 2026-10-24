@@ -90,7 +90,7 @@ type Action =
   | { type: 'simulate' }
   | { type: 'switch'; id: string }
   | { type: 'deleteBoard'; id: string }
-  | { type: 'importTrello'; board: Board; byCard: Record<string, string>; by: string | null }
+  | { type: 'importTrello'; board: Board; byCard: Record<string, string>; by: string | null; open: boolean | 'ifChanged' }
   | { type: 'settings'; patch: Partial<Settings> };
 
 const KEY = 'handrail:v1';
@@ -305,7 +305,11 @@ function created(saved: Saved, board: Board, made?: Doc): Saved {
  * last import is applied, credited to whoever did it there, and listed in "Since you last looked".
  * Edits made in Handrail in between are kept unless Trello changed the same thing.
  */
-export function importFromTrello(saved: Saved, board: Board, byCard: Record<string, string>, by: string | null): { saved: Saved; fresh: Change[]; updated: boolean } {
+export function importFromTrello(
+  saved: Saved, board: Board, byCard: Record<string, string>, by: string | null,
+  /** Switch to the board afterwards: always, or only if Trello changed something (for background checks). */
+  open: boolean | 'ifChanged' = true,
+): { saved: Saved; fresh: Change[]; updated: boolean } {
   const local = saved.docs[board.id];
   const last = saved.trello?.[board.id];
   if (!local || !last) {
@@ -323,7 +327,8 @@ export function importFromTrello(saved: Saved, board: Board, byCard: Record<stri
   };
   // Trello's export is newer than anything already here, so its writes are ordered after them.
   const theirs = commit({ ...last, clock: Math.max(last.clock, local.clock) }, steady, TRELLO_ACTOR, by, Date.now(), byCard);
-  const { saved: next, fresh } = receive(saved, theirs);
+  const { saved: merged, fresh } = receive(saved, theirs, open === true);
+  const next = open === 'ifChanged' && fresh.length ? { ...merged, currentId: board.id } : merged;
   return { saved: { ...next, trello: { ...(next.trello ?? {}), [board.id]: theirs } }, fresh, updated: true };
 }
 
@@ -427,8 +432,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, saved: { ...next, currentId }, past: currentId === saved.currentId ? state.past : [], future: [] };
     }
     case 'importTrello': {
-      const sameBoardOpen = action.board.id === saved.currentId;
-      const { saved: next } = importFromTrello(saved, action.board, action.byCard, action.by);
+      const { saved: next } = importFromTrello(saved, action.board, action.byCard, action.by, action.open);
+      const sameBoardOpen = next.currentId === saved.currentId;
       return { ...state, saved: next, past: sameBoardOpen ? state.past : [], future: sameBoardOpen ? state.future : [] };
     }
     case 'settings':
@@ -482,9 +487,9 @@ export function useHandrail() {
     isPlausible: (d: Doc) => plausible(saved.docs[d.id], d),
     createBoard: useCallback((b: Board) => dispatch({ type: 'create', board: b }), []),
     /** Imports a Trello export and says whether it updated a board imported before, and how many changes it found. */
-    importTrello: (b: Board, byCard: Record<string, string>, by: string | null) => {
-      const r = importFromTrello(saved, b, byCard, by);
-      dispatch({ type: 'importTrello', board: b, byCard, by });
+    importTrello: (b: Board, byCard: Record<string, string>, by: string | null, open: boolean | 'ifChanged' = true) => {
+      const r = importFromTrello(saved, b, byCard, by, open);
+      dispatch({ type: 'importTrello', board: b, byCard, by, open });
       return { updated: r.updated, changes: r.fresh.length };
     },
     simulateTeammates: useCallback(() => dispatch({ type: 'simulate' }), []),

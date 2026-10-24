@@ -67,7 +67,7 @@ flowchart LR
   - Size caps, and a bounded decompressor so a tiny link can't expand into gigabytes.
   - Names reserved by JavaScript objects are rejected.
   - Clocks and version vectors are derived from the writes themselves, and implausible clocks are refused.
-- **Testing:** 133 Vitest tests and 60 Playwright tests.
+- **Testing:** 134 Vitest tests and 61 Playwright tests.
   - Property-based tests (fast-check) generate hundreds of random three-person edit-and-swap histories and check that everyone ends up with the same, well-formed board.
   - Browser tests cover two people merging concurrent edits, keyboard-only use, and a real two-browser live session.
   - **axe-core** checks WCAG 2.2 AA in light, dark and high-contrast themes, every dialog, phone width and 200% text, with zero violations.
@@ -76,5 +76,6 @@ flowchart LR
 
 - **By default nothing leaves your device.** Boards are saved in your browser's local storage, and there are no accounts and no analytics.
 - **Share links** carry the board in the part of the address after `#`, which browsers never send to a web server. Anyone you give the link to can read the board and, by sending their copy back, edit it.
+- **Trello connection is opt-in and read-only.** The browser talks to Trello directly (api.trello.com); there is no Handrail server in between. Trello's sign-in token is kept in this browser's local storage, can only read, and expires after 30 days. Disconnect forgets it.
 - **Live sessions are opt-in.** To find each other, browsers exchange connection details through public Nostr relays (encrypted with the room code) and public STUN servers; after that, board data goes directly between browsers over encrypted WebRTC. As with any peer-to-peer call, people in the same session can see each other's IP address. Anyone with the invite link can join and edit, so only send it to your group.
 
