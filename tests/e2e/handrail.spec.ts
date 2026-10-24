@@ -379,12 +379,18 @@ test.describe('activity panel', () => {
   test('the arrival summary is short, “more” reads the rest, and “repeat” says it again', async ({ page }) => {
     await simulate(page);
     await expect(live(page)).toContainText('4 changes since you last looked, 1 for you. Riya gave you');
-    await expect(live(page)).toContainText('Say or type “more” for the rest.');
+    await expect(live(page)).toContainText('Say or type “more” for the rest of the changes.');
     await expect(live(page)).not.toContainText('Arjun moved');
+    // The summary ends with one clear next step, also shown in the panel.
+    await expect(live(page)).toContainText('Your next step: “Draft the outline”. It’s overdue by 1 day.');
+    await expect(page.getByTestId('next-step')).toContainText('Your next step: “Draft the outline”');
     await run(page, 'more');
     await expect(live(page)).toHaveText('Arjun moved “Write the presentation script” to Doing.');
     await run(page, 'repeat');
     await expect(live(page)).toHaveText('Arjun moved “Write the presentation script” to Doing.');
+    await run(page, 'what next');
+    await expect(live(page)).toHaveText('Your next step: “Draft the outline”. It’s overdue by 1 day.');
+    await expect(cardIn(page, 'Doing', 'Draft the outline')).toBeFocused();
     // With unread changes, the first thing to Tab to is a link straight to them.
     await page.reload();
     await page.keyboard.press('Tab');

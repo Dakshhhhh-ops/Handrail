@@ -9,6 +9,7 @@ import { executeCommand } from './model/execute';
 import { previewCommand } from './model/preview';
 import { revertEdit } from './model/revert';
 import { summarize, summarySentences } from './model/summary';
+import { nextStep } from './model/next';
 import { findColumn, findPerson } from './model/match';
 import { demoBoard } from './model/seed';
 import { TRELLO_SOMEONE } from './model/importers';
@@ -315,7 +316,8 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
       // First sentence only, so it's short enough to hear in full; "more" reads the rest.
       const parts = summarySentences(store.changes, me, today);
       moreToSay.current = parts.slice(1).join(' ');
-      const said = `Opened the shared “${title}”. ${n} ${n === 1 ? 'change' : 'changes'} since you last looked${forYou ? `, ${forYou} for you` : ''}. ${parts[0]}${parts.length > 1 ? ' Say or type “more” for the rest.' : ''}`;
+      const next = nextStep(store.board, me, today, store.changes);
+      const said = `Opened the shared “${title}”. ${n} ${n === 1 ? 'change' : 'changes'} since you last looked${forYou ? `, ${forYou} for you` : ''}. ${parts[0]}${next ? ` ${next.text}` : ''}${parts.length > 1 ? ' Say or type “more” for the rest of the changes.' : ''}`;
       const pending = window.setTimeout(() => announce(said), 400);
       // If they act straight away, their action's announcement wins over the summary.
       const cancel = () => window.clearTimeout(pending);
@@ -505,6 +507,11 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
       reply = moreToSay.current || 'That’s everything. Say “what changed” to hear it all again.';
       moreToSay.current = '';
     } else if (r.effect === 'repeat') reply = lastMessage || 'Nothing to repeat yet.';
+    else if (r.effect === 'next') {
+      const next = nextStep(board, me, today, store.changes);
+      reply = next ? next.text : me ? 'Nothing open is assigned to you. Say “my tasks” or “summary” to look around.' : 'Set your name in Settings first, so Handrail knows which cards are yours.';
+      if (next) focusCardLater(next.cardId);
+    }
     if (r.board) store.apply(r.board, r.label ?? 'change');
     if (reply && r.effect !== 'undo' && r.effect !== 'redo') announce(reply);
     addHistory('you', text);
@@ -736,6 +743,7 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
         setHighlightId(id);
       }}
       digest={summarize(justMine ? store.changes.filter((c) => c.forYou) : store.changes, me, today)}
+      next={nextStep(board, me, today, store.changes)}
       onReadAll={() => announce(readChanges())}
       onReplay={() => replayChanges(justMine ? store.changes.filter((c) => c.forYou) : store.changes)}
       hasBefore={!!before}

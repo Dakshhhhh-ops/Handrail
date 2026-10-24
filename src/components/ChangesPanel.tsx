@@ -1,3 +1,4 @@
+import type { NextStep } from '../model/next';
 import { useEffect, useState } from 'react';
 import type { Change } from '../model/diff';
 import type { Board } from '../model/types';
@@ -13,8 +14,10 @@ function summary(changes: Change[]) {
  * list to one row, which stays until new changes arrive.
  */
 export function ChangesPanel({
-  changes, acknowledged, justMine, board, digest, onGoTo, onReadAll, onDone, onReplay, hasBefore, showingBefore, onToggleBefore,
+  changes, acknowledged, justMine, board, digest, onGoTo, onReadAll, onDone, onReplay, hasBefore, showingBefore, onToggleBefore, next,
 }: {
+  /** The one card to do next, if any of yours are open. */
+  next?: NextStep | null;
   hasBefore: boolean;
   showingBefore: boolean;
   onToggleBefore: () => void;
@@ -68,6 +71,14 @@ export function ChangesPanel({
           {shown.length > 0 && (
             <p className="digest" data-testid="digest">
               {digest}
+            </p>
+          )}
+          {next && (
+            <p className="next-step" data-testid="next-step">
+              <span>{next.text}</span>{' '}
+              <button type="button" className="btn btn-quiet small" onClick={() => onGoTo(next.cardId)}>
+                Go to it
+              </button>
             </p>
           )}
           {shown.length > 0 ? (

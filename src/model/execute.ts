@@ -23,7 +23,7 @@ export interface ExecResult {
   /** Card that should receive keyboard focus afterwards. */
   focusCardId?: string;
   /** Something the app itself must do. */
-  effect?: 'undo' | 'redo' | 'help' | 'changes' | 'more' | 'repeat';
+  effect?: 'undo' | 'redo' | 'help' | 'changes' | 'more' | 'repeat' | 'next';
 }
 
 const quote = (s: string) => `“${s}”`;
@@ -74,6 +74,7 @@ export function executeCommand(cmd: Command, board: Board, ctx: ExecContext): Ex
     case 'help': return { ok: true, message: '', effect: 'help' };
     case 'changes': return { ok: true, message: '', effect: 'changes' };
     case 'more': return { ok: true, message: '', effect: 'more' };
+    case 'next': return { ok: true, message: '', effect: 'next' };
     case 'repeat': return { ok: true, message: '', effect: 'repeat' };
     case 'summary': return { ok: true, message: boardSummary(board, today, me) };
     case 'mine': return { ok: true, message: mineReport(board, today, me) };

@@ -634,6 +634,8 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 }
 :root[data-theme='contrast'] .news-num { border-color: #fff; box-shadow: none; }
 .digest { margin: 0 0 0.85rem; font-size: 1.04rem; line-height: 1.55; }
+.next-step { margin: 0 0 0.85rem; padding: 0.55rem 0.75rem; border-left: 4px solid currentColor; border-radius: 6px; background: color-mix(in srgb, currentColor 7%, transparent); font-weight: 600; line-height: 1.5; }
+.next-step .btn { margin-left: 0.25rem; }
 .changes-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
 .changes-collapsed { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .change-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.4rem; }

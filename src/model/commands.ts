@@ -23,6 +23,7 @@ export type Command =
   | { type: 'summary' }
   | { type: 'changes' }
   | { type: 'more' }
+  | { type: 'next' }
   | { type: 'repeat' }
   | { type: 'undo' }
   | { type: 'redo' }
@@ -110,6 +111,7 @@ export function parseCommand(raw: string, ctx: ParseContext): Command {
   if (/^(undo|undo that|take that back|oops)$/.test(t)) return { type: 'undo' };
   if (/^(redo|redo that)$/.test(t)) return { type: 'redo' };
   if (/^(more|tell me more|go on|continue|the rest|and)$/.test(t)) return { type: 'more' };
+  if (/^(what('?s| is)? next|what now|next step|my next step|what should i do( next| now)?|what do i do( next| now)?|where do i start)$/.test(t)) return { type: 'next' };
   if (/^(repeat|repeat that|again|say (that|it) again|what did you say|pardon|sorry)$/.test(t)) return { type: 'repeat' };
   if (/^(help|what can i (say|do)|commands|\?)$/.test(t)) return { type: 'help' };
   if (/^(summary|summarise|summarize|status|overview|where am i|read (the )?board|read everything|read all|what'?s on the board)$/.test(t))

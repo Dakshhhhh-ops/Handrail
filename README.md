@@ -15,7 +15,7 @@ Handrail does one job: **telling you what your teammates changed, when you can't
 
 1. **Changes arrive:** a teammate's link, or a newer Trello export.
 2. **Handrail says what changed,** in plain sentences, with what involves you first.
-3. **You act on it without dragging:** keys, a menu, or a typed or spoken sentence. Undo anything.
+3. **You know your next step, and act on it without dragging:** Handrail names the one card to do next, and you use keys, a menu, or a typed or spoken sentence. Undo anything.
 
 The supporting pieces exist only because the loop needs them. The CRDT merge lets two copies of a board be compared and combined. Keyboard moves make the board usable at all without a mouse. Trello import means nobody has to switch tools.
 
@@ -53,6 +53,7 @@ Trello ids are kept, so a re-import updates the same board instead of making a c
 | Dragging a card | Type or say **"move find sources to doing"** (Handrail shows what it will do before you press Enter), press a **number key** (3 sends it to column 3), or **pick it up with Space** and move it with the arrow keys |
 | Reading every card to find deadlines | Ask **"what's due this week"**, **"anything overdue"** or **"my tasks"**, or press **Just mine** to see only your cards and the changes that involve you |
 | Fiddly date pickers | Type **"due next friday"**, **"in 3 days"** or **"oct 30"** |
+| Working out what to do first | Every summary ends with **one next step**: *"Your next step: 'Draft the outline'. It's overdue by 1 day."* Ask **"what next"** any time. It picks the most overdue card, then one a teammate just gave you, then the one due soonest |
 | Sitting through a long readout | Hear the count and the first sentence; say **"more"** for the rest, or **"repeat"** to hear the last message again |
 | Hoping you didn't break something | **Undo** any change with Ctrl+Z, the Undo button, or by saying "undo" |
 | Spotting what moved by eye | **Before / now** flips the board to how it looked when you last saw it; flip back and every changed card glides to its new place. **Show me on the board** sends each teammate's name-tagged cursor to the cards they changed |
@@ -82,7 +83,7 @@ Trello ids are kept, so a re-import updates the same board instead of making a c
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm test             # 129 unit and property-based tests
+npm test             # 133 unit and property-based tests
 npm run test:e2e     # 60 browser tests, including the axe accessibility audit
 npm run build        # static site in dist/
 ```
