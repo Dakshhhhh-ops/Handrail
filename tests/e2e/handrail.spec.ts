@@ -714,6 +714,10 @@ test.describe('the story (first visit)', () => {
     await page.keyboard.press('Tab');
     await expect(page.getByRole('button', { name: 'Open the board' }).first()).toBeFocused();
     await page.keyboard.press('Enter');
+    // A first visit opens "How to use" first; skipping it lands on the changes.
+    const tour = page.getByTestId('tour');
+    await expect(tour.getByRole('button', { name: 'Next' })).toBeFocused();
+    await tour.getByRole('button', { name: 'Skip' }).click();
     // A first visit lands on the main feature: teammates' changes already waiting and announced.
     await expect(page.getByRole('heading', { name: 'Since you last looked' })).toBeFocused();
     await expect(page.getByTestId('live-region')).toContainText('4 changes since you last looked, 1 for you');
@@ -738,9 +742,41 @@ test.describe('the story (first visit)', () => {
     const page = await ctx.newPage();
     await page.goto('/?board');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+    await page.getByTestId('tour').getByRole('button', { name: 'Skip' }).click();
     await expect(page.getByTestId('changes')).toContainText('4');
     await expect(page.getByRole('heading', { name: 'Since you last looked' })).toBeFocused();
     await expect(page.getByRole('complementary', { name: 'New here' }).getByRole('button', { name: 'Try it with your eyes closed' })).toBeVisible();
+    await ctx.close();
+  });
+
+  test('“How to use” walks a first visit through the main parts, and can be opened again from Help', async ({ browser }) => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    await page.goto('/?board');
+    const tour = page.getByTestId('tour');
+    await expect(tour.getByRole('heading', { name: 'Welcome to Handrail' })).toBeVisible();
+    await tour.getByRole('button', { name: 'Next' }).click();
+    await expect(tour.getByRole('heading', { name: 'See what changed' })).toBeFocused();
+    await expect(page.locator('#changes')).toHaveClass(/tour-target/);
+    await page.waitForTimeout(600);
+    const r = await new AxeBuilder({ page }).include('[data-testid="tour"]').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze();
+    expect(r.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+    for (const title of ['Move cards without dragging', 'Or just say it', 'You’re ready']) {
+      await tour.getByRole('button', { name: 'Next' }).click();
+      await expect(tour.getByRole('heading', { name: title })).toBeFocused();
+    }
+    await tour.getByRole('button', { name: 'Start using Handrail' }).click();
+    await expect(tour).toBeHidden();
+    // Then it lands on the changes, which waited for the tour.
+    await expect(page.getByRole('heading', { name: 'Since you last looked' })).toBeFocused();
+    await expect(live(page)).toContainText('4 changes since you last looked');
+    // Shown once; Help opens it again.
+    await page.reload();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Climate talk/);
+    await expect(tour).toBeHidden();
+    await page.getByRole('button', { name: 'Help' }).click();
+    await page.getByTestId('help').getByRole('button', { name: 'Quick tour' }).click();
+    await expect(tour.getByRole('heading', { name: 'Welcome to Handrail' })).toBeVisible();
     await ctx.close();
   });
 
@@ -748,6 +784,7 @@ test.describe('the story (first visit)', () => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await page.goto('/?board');
+    await page.getByTestId('tour').getByRole('button', { name: 'Skip' }).click();
     await page.getByRole('button', { name: 'Share' }).click();
     const link = await page.getByLabel(/Link to/).inputValue();
     const fresh = await (await browser.newContext()).newPage();

@@ -14,7 +14,10 @@ export function Modal({
   wide = false,
   full = false,
   testId,
+  className = '',
 }: {
+  /** Extra class on the dialog, for special layouts (e.g. the tour sits to one side). */
+  className?: string;
   open: boolean;
   onClose: () => void;
   title: string;
@@ -42,7 +45,7 @@ export function Modal({
   return (
     <dialog
       ref={ref}
-      className={`modal${wide ? ' modal-wide' : ''}${full ? ' modal-full' : ''}`}
+      className={`modal${wide ? ' modal-wide' : ''}${full ? ' modal-full' : ''}${className ? ` ${className}` : ''}`}
       aria-labelledby={`${id}-t`}
       aria-describedby={description ? `${id}-d` : undefined}
       data-testid={testId}

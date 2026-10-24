@@ -29,6 +29,7 @@ import { entrance, replay } from './lib/motion';
 import { personClass } from './components/BoardView';
 import type { Change } from './model/diff';
 import { Modal } from './components/Modal';
+import { Tour, TOUR_SEEN } from './components/Tour';
 // The story is only for first visits, so it loads separately and the board opens faster.
 const Landing = lazy(() => import('./components/Landing').then((m) => ({ default: m.Landing })));
 import { Blindfold } from './components/Blindfold';
@@ -197,6 +198,20 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
     };
   }, [announce]);
   const [blindfold, setBlindfold] = useState(() => new URLSearchParams(window.location.search).has('blindfold'));
+  // "How to use": opens by itself on a first visit, and from Help or the New here line.
+  const [tourOpen, setTourOpen] = useState(() => {
+    try { return firstVisit && !blindfold && !localStorage.getItem(TOUR_SEEN); } catch { return false; }
+  });
+  const tourOpenRef = useRef(tourOpen);
+  tourOpenRef.current = tourOpen;
+  /** Landing on the changes waits until the tour closes, so the two don't talk over each other. */
+  const pendingLanding = useRef<(() => void) | null>(null);
+  const closeTour = () => {
+    setTourOpen(false);
+    const land = pendingLanding.current;
+    pendingLanding.current = null;
+    if (land) window.setTimeout(land, 60);
+  };
   const before = store.beforeBoard;
   const viewing = showBefore && before ? before : store.board;
   // Any change to the real board (yours or a teammate's) brings you back to now.
@@ -320,18 +335,23 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
       moreToSay.current = parts.slice(1).join(' ');
       const next = nextStep(store.board, me, today, store.changes);
       const said = `Opened the shared “${title}”. ${n} ${n === 1 ? 'change' : 'changes'} since you last looked${forYou ? `, ${forYou} for you` : ''}. ${parts[0]}${next ? ` ${next.text}` : ''}${parts.length > 1 ? ' Say or type “more” for the rest of the changes.' : ''}`;
-      const pending = window.setTimeout(() => announce(said), 400);
-      // If they act straight away, their action's announcement wins over the summary.
-      const cancel = () => window.clearTimeout(pending);
-      window.addEventListener('pointerdown', cancel, { once: true, capture: true });
-      window.addEventListener('keydown', cancel, { once: true, capture: true });
-      if (wide) {
-        focusLater('changes-h');
-        window.setTimeout(() => replayChanges(store.changes), 700);
-      } else {
-        lastFocus.current = null;
-        setActivityOpen(true);
-      }
+      const changes = store.changes;
+      const land = () => {
+        const pending = window.setTimeout(() => announce(said), 400);
+        // If they act straight away, their action's announcement wins over the summary.
+        const cancel = () => window.clearTimeout(pending);
+        window.addEventListener('pointerdown', cancel, { once: true, capture: true });
+        window.addEventListener('keydown', cancel, { once: true, capture: true });
+        if (wide) {
+          focusLater('changes-h');
+          window.setTimeout(() => replayChanges(changes), 700);
+        } else {
+          lastFocus.current = null;
+          setActivityOpen(true);
+        }
+      };
+      if (tourOpenRef.current) pendingLanding.current = land;
+      else land();
     } else {
       announce(`Opened the shared “${title}”. Nothing new since you last looked.`);
     }
@@ -895,6 +915,9 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
               <button type="button" className="btn btn-primary small" onClick={() => { dismissWelcome(); setBlindfold(true); }}>
                 Try it with your eyes closed
               </button>
+              <button type="button" className="btn btn-secondary small" onClick={() => setTourOpen(true)}>
+                How to use
+              </button>
               {!arrived && (
                 <button type="button" className="btn btn-quiet small" onClick={() => { dismissWelcome(); onStory(); }}>
                   1-minute story
@@ -1032,7 +1055,9 @@ function Shell({ store, onStory, arrived, newHere, firstVisit }: { store: Handra
         }}
       />
       <SettingsDialog open={dialog === 'settings'} onClose={closeDialog} settings={settings} onChange={store.updateSettings} />
-      <HelpDialog open={dialog === 'help'} onClose={closeDialog} onChallenge={() => { setDialog(null); setBlindfold(true); }} onStory={() => { setDialog(null); onStory(); }} />
+      <HelpDialog open={dialog === 'help'} onClose={closeDialog} onChallenge={() => { setDialog(null); setBlindfold(true); }} onStory={() => { setDialog(null); onStory(); }}
+        onTour={() => { setDialog(null); setTourOpen(true); }} />
+      <Tour open={tourOpen && !blindfold} onClose={closeTour} onChallenge={() => setBlindfold(true)} />
       <Blindfold
         open={blindfold}
         onClose={() => {

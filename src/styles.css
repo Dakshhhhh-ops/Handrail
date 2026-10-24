@@ -939,3 +939,13 @@ fieldset.field > legend { margin-bottom: 0.3rem; }
 /* Headings that receive focus (e.g. "Since you last looked" on arrival): a bold ring in the
    heading's own colour, instead of the browser's thin default. Still clearly visible. */
 :is(h1, h2, h3)[tabindex='-1']:focus-visible { outline: 3px solid currentColor; outline-offset: 5px; border-radius: 6px; }
+
+/* ---- How to use (tour) ------------------------------------------------------------- */
+/* A compact card in the lower-left corner, with a light dim, so the highlighted part of the page stays visible. */
+dialog.modal.tour { margin: 0; inset: auto auto 1.25rem 1.25rem; width: min(26rem, calc(100vw - 2.5rem)); max-height: calc(100vh - 2.5rem); }
+dialog.modal.tour::backdrop { background: rgb(10 10 30 / 0.3); }
+.tour-step h3 { font-family: var(--display); font-weight: 800; font-size: 1.6rem; text-transform: uppercase; letter-spacing: 0.02em; margin: 0.1rem 0 0.5rem; }
+.tour-step p { margin: 0 0 0.6rem; line-height: 1.55; }
+.tour-count { font-family: var(--mono); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.tour-target { outline: 4px solid var(--butter) !important; outline-offset: 6px; border-radius: 14px; box-shadow: 0 0 0 12px rgb(255 230 0 / 0.18); transition: outline-offset 0.2s; }
+@media (max-width: 700px) { dialog.modal.tour { inset: auto 0.75rem 0.75rem 0.75rem; width: auto; } }

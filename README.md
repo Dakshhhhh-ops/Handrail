@@ -84,7 +84,7 @@ Trello ids are kept, so a re-import updates the same board instead of making a c
 npm install
 npm run dev          # http://localhost:5173
 npm test             # 136 unit and property-based tests
-npm run test:e2e     # 61 browser tests, including the axe accessibility audit
+npm run test:e2e     # 62 browser tests, including the axe accessibility audit
 npm run build        # static site in dist/
 ```
 
