@@ -107,6 +107,15 @@ test('one Escape keeps going (it cancels a picked-up card); two quick Escapes st
   await expect(page.locator('html')).not.toHaveClass(/bf-on/);
 });
 
+test('the challenge reads a card the way a screen reader would, without the visual badges', async ({ page }) => {
+  await startChallenge(page);
+  await page.locator('#card-k-email').focus();
+  const focus = page.locator('.bf-focus');
+  await expect(focus).toContainText('Email Dr. Mehta about the extension, due today, assigned to you.');
+  await expect(focus).not.toContainText('reassignedToday');
+  await expect(focus).not.toContainText('Riya · reassigned.Riya');
+});
+
 test('dialogs opened during the challenge stay hidden from sight', async ({ page }) => {
   await startChallenge(page);
   await page.locator('#card-k-sources').focus();

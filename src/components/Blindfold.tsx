@@ -38,10 +38,18 @@ function utter(text: string, rate: number, interrupt: boolean) {
   synth.speak(u);
 }
 
+/** An element's text as a screen reader gets it: anything marked aria-hidden (visual badges, icons) is left out. */
+function readableText(el: Element | null | undefined): string {
+  if (!el) return '';
+  const copy = el.cloneNode(true) as Element;
+  copy.querySelectorAll('[aria-hidden="true"]').forEach((x) => x.remove());
+  return copy.textContent ?? '';
+}
+
 /** What a screen reader would say for the focused element, in short. */
 function spokenName(el: HTMLElement): string {
-  const byIds = el.getAttribute('aria-labelledby')?.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
-  const label = el.getAttribute('aria-label') || byIds || (el as HTMLInputElement).labels?.[0]?.textContent || el.getAttribute('placeholder') || el.textContent || '';
+  const byIds = el.getAttribute('aria-labelledby')?.split(/\s+/).map((id) => readableText(document.getElementById(id))).join(' ');
+  const label = el.getAttribute('aria-label') || byIds || readableText((el as HTMLInputElement).labels?.[0]) || el.getAttribute('placeholder') || readableText(el);
   const name = label.replace(/\s+/g, ' ').trim();
   const tag = el.tagName.toLowerCase();
   const role = el.getAttribute('role') || (tag === 'button' ? 'button' : tag === 'a' ? 'link' : tag === 'input' || tag === 'textarea' ? 'edit text' : '');
