@@ -6,7 +6,7 @@
 
 Handrail is a project board for group work. When your teammates change things, it tells you in a few plain sentences what changed and who did it, starting with what involves you, and then names the one card you should do next. It's built first for screen-reader users, who otherwise have to listen to every card on the board to find one change.
 
-**[Open Handrail](https://dakshhhhh-ops.github.io/Handrail/?board)** · **[Try it with your eyes closed](https://dakshhhhh-ops.github.io/Handrail/?blindfold)** · [How it works](docs/HOW-IT-WORKS.md) · [Evidence of the problem](docs/EVIDENCE.md)
+**[Open Handrail](https://dakshhhhh-ops.github.io/Handrail/?board)** · **[Watch the 3-minute demo](https://youtu.be/kABhEhYR3M8)** · **[Try it with your eyes closed](https://dakshhhhh-ops.github.io/Handrail/?blindfold)** · [How it works](docs/HOW-IT-WORKS.md) · [Evidence of the problem](docs/EVIDENCE.md)
 
 No account, no install, no server. It runs in the browser, keeps your boards on your device, and works offline after the first visit.
 
