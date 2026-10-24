@@ -10,7 +10,7 @@ Handrail is a project board for group work. When your teammates change things, i
 
 No account, no install, no server. It runs in the browser and keeps your boards on your device.
 
-![The board with the Activity panel open: "Since you last looked: 4 changes, 1 for you", a plain-sentence summary, the next step "Draft the outline", and changed cards tagged with who changed them](docs/changes.png)
+![Handrail on a first visit: a "New here?" line, the board with changed cards tagged with who changed them, and the Activity panel: "Since you last looked: 4 changes, 1 for you", a plain-sentence summary and the next step "Draft the outline"](docs/changes.png)
 
 ## Try it in one minute
 
@@ -61,7 +61,7 @@ The rest exists because the loop needs it: the merge lets two copies of a board 
 
 | Quick tour | Light theme | Phone |
 |---|---|---|
-| ![The quick tour, step 2 of 5, "See what changed", with the Since you last looked panel highlighted](docs/tour.png) | ![The board in the light theme with the dark Activity panel](docs/contrast.png) | ![The board on a phone: columns stacked, the command box docked at the bottom](docs/phone.png) |
+| ![The quick tour, step 2 of 5, "See what changed", with the Since you last looked panel highlighted](docs/tour.png) | ![The board in the light theme with the dark Activity panel](docs/contrast.png) | ![Handrail on a phone: the "New here?" line, columns stacked, an Activity button showing 4, and the command box docked at the bottom](docs/phone.png) |
 
 ## Works with Trello
 
